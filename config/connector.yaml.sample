@@ -1,19 +1,21 @@
 ---
 parameters:
-  resourcespace_api:
-    url: ''
-    username: ''
-    key: ''
+  resourcespace:
+    api:
+      url: ''
+      username: ''
+      key: ''
+    search_query: 'publisher:TEST'
 
-  resourcespace_search_query: 'publisher:TEST'
-
-  qi_api:
-    url: ''
-    username: ''
-    password: ''
+  qi:
+    api:
+      url: ''
+      username: ''
+      password: ''
 
   # Certificate Authority (also known as 'cacert') may not work on its own depending on your system and PHP configuration,
   # that's why a cacert.pem is included in this project (from https://curl.haxx.se/docs/caextract.html).
   # Set override_certificate_authority to 'true' when we need to specify our own cacert.pem (can be a relative path or an absolute system path).
-  override_certificate_authority: false
-  ssl_certificate_authority_file: ''
+  ssl_certificate_authority:
+    override: false
+    authority_file: ''

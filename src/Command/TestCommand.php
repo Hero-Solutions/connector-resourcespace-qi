@@ -37,10 +37,14 @@ class TestCommand extends Command
 
     private function test()
     {
-        $this->resourceSpace = new ResourceSpace($this->params);
-        $this->qi = new Qi($this->params);
-        $searchQuery = $this->params->get('resourcespace_search_query');
-        $allResources = $this->resourceSpace->getAllResources(urlencode($searchQuery));
+        $rsConfig = $this->params->get('resourcespace');
+        $qiConfig = $this->params->get('qi');
+        $sslCertificateAuthority = $this->params->get('ssl_certificate_authority');
+
+        $this->resourceSpace = new ResourceSpace($rsConfig['api']);
+        $this->qi = new Qi($qiConfig['api'], $sslCertificateAuthority);
+
+        $allResources = $this->resourceSpace->getAllResources(urlencode($rsConfig['search_query']));
         echo count($allResources) . ' resources total' . PHP_EOL;
 
         $allObjects = $this->qi->getAllObjects();
@@ -48,14 +52,12 @@ class TestCommand extends Command
 
         foreach ($allResources as $resourceInfo) {
             $resourceId = $resourceInfo['ref'];
-            // Get this resource's metadata, but only if it has an appropriate offloadStatus
-            $resourceMetadata = $this->resourceSpace->getResourceData($resourceId);
-            $originalFilename = $resourceMetadata['originalfilename'];
-            $inventoryNumber = $resourceMetadata['inventorynumber'];
+            $filename = $resourceInfo[$rsConfig['filename_field']];
+            $inventoryNumber = $resourceInfo[$rsConfig['inventory_number_field']];
             if(array_key_exists($inventoryNumber, $allObjects)) {
                 echo 'Resource ' . $resourceId . ' has matching object ' . $allObjects[$inventoryNumber]->name . PHP_EOL;
             }
-            echo $originalFilename . PHP_EOL;
+            echo $filename . PHP_EOL;
         }
     }
 }

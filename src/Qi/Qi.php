@@ -12,15 +12,14 @@ class Qi
     private $overrideCertificateAuthorityFile;
     private $sslCertificateAuthorityFile;
 
-    public function __construct(ParameterBagInterface $params)
+    public function __construct($qiApi, $sslCertificateAuthority)
     {
-        $qiApi = $params->get('qi_api');
         $this->baseUrl = $qiApi['url'];
         $this->username = $qiApi['username'];
         $this->password = $qiApi['password'];
 
-        $this->overrideCertificateAuthorityFile = $params->get('override_certificate_authority');
-        $this->sslCertificateAuthorityFile = $params->get('ssl_certificate_authority_file');
+        $this->overrideCertificateAuthorityFile = $sslCertificateAuthority['override'];
+        $this->sslCertificateAuthorityFile = $sslCertificateAuthority['authority_file'];
     }
 
     public function getAllObjects()
@@ -48,7 +47,7 @@ class Qi
 
     public function get($url)
     {
-        echo $url . PHP_EOL;
+        echo 'GET '. $url . PHP_EOL;
         $ch = curl_init();
         if ($this->overrideCertificateAuthorityFile) {
             curl_setopt($ch,CURLOPT_CAINFO, $this->sslCertificateAuthorityFile);

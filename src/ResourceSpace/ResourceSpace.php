@@ -12,9 +12,8 @@ class ResourceSpace
     private $apiUsername;
     private $apiKey;
 
-    public function __construct(ParameterBagInterface $params)
+    public function __construct($resourceSpaceApi)
     {
-        $resourceSpaceApi = $params->get('resourcespace_api');
         $this->apiUrl = $resourceSpaceApi['url'];
         $this->apiUsername = $resourceSpaceApi['username'];
         $this->apiKey = $resourceSpaceApi['key'];
