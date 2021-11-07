@@ -50,14 +50,43 @@ class TestCommand extends Command
         $allObjects = $this->qi->getAllObjects();
         echo count($allObjects) . ' objects total' . PHP_EOL;
 
+        $toUpload = 0;
+        $same = 0;
+
         foreach ($allResources as $resourceInfo) {
-            $resourceId = $resourceInfo['ref'];
-            $filename = $resourceInfo[$rsConfig['filename_field']];
             $inventoryNumber = $resourceInfo[$rsConfig['inventory_number_field']];
             if(array_key_exists($inventoryNumber, $allObjects)) {
-                echo 'Resource ' . $resourceId . ' has matching object ' . $allObjects[$inventoryNumber]->name . PHP_EOL;
+                $resourceId = $resourceInfo['ref'];
+                $rsFilename = $resourceInfo[$rsConfig['filename_field']];
+                $upload = true;
+                if(property_exists($allObjects[$inventoryNumber], 'media')) {
+                    if(!empty($allObjects[$inventoryNumber]->media)) {
+                        if (property_exists($allObjects[$inventoryNumber]->media, 'image')) {
+                            if(!empty($allObjects[$inventoryNumber]->media->image)) {
+                                if (property_exists($allObjects[$inventoryNumber]->media->image, 'filename')) {
+                                    $qiFilename = $allObjects[$inventoryNumber]->media->image->filename;
+                                    $rsFilenameWithoutExtension = strtolower(pathinfo($rsFilename, PATHINFO_FILENAME));
+                                    $qiFilenameWithoutExtension = strtolower(pathinfo($qiFilename, PATHINFO_FILENAME));
+                                    if($rsFilenameWithoutExtension === $qiFilenameWithoutExtension) {
+                                        echo 'SAME: Resource ' . $resourceId . ' has matching object ' . $allObjects[$inventoryNumber]->name . ', image names: ' . $rsFilename . ', ' . $qiFilename . PHP_EOL;
+                                        $upload = false;
+                                    } else {
+                                        echo 'CHECK: Resource ' . $resourceId . ' has matching object ' . $allObjects[$inventoryNumber]->name . ', image names: ' . $rsFilename . ', ' . $qiFilename . PHP_EOL;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if($upload) {
+                    echo 'UPLOAD: Resource ' . $resourceId . ' has matching object ' . $allObjects[$inventoryNumber]->name . ' for RS filename ' . $rsFilename . PHP_EOL;
+                    $toUpload++;
+                } else {
+                    $same++;
+                }
             }
-            echo $filename . PHP_EOL;
+//            echo $filename . PHP_EOL;
         }
+        echo 'To upload: ' . $toUpload . ', same: ' . $same . PHP_EOL;
     }
 }
