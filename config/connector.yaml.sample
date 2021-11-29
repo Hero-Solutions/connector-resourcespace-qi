@@ -16,7 +16,7 @@ parameters:
       url: ''
       username: ''
       password: ''
-    get_fields: 'object_number,ipr_status_value,ipr_status_reference,rights_statement,internalnote,relationship'
+    get_fields: 'object_number,ipr_status_value,rights_statement,internalnote,relationship'
 
   # Certificate Authority (also known as 'cacert') may not work on its own depending on your system and PHP configuration,
   # that's why a cacert.pem is included in this project (from https://curl.haxx.se/docs/caextract.html).
