@@ -6,16 +6,67 @@ parameters:
       username: ''
       key: ''
     search_query: 'publisher:TEST'
+    fields:
+      filename: field51
+      inventory_number: field105
+      title: field8
 
   qi:
     api:
       url: ''
       username: ''
       password: ''
+    get_fields: 'object_number,ipr_status_value,ipr_status_reference,rights_statement,internalnote,relationship'
 
   # Certificate Authority (also known as 'cacert') may not work on its own depending on your system and PHP configuration,
   # that's why a cacert.pem is included in this project (from https://curl.haxx.se/docs/caextract.html).
   # Set override_certificate_authority to 'true' when we need to specify our own cacert.pem (can be a relative path or an absolute system path).
   ssl_certificate_authority:
     override: false
-    authority_file: ''
+    authority_file: '/path/to/cacert.pem'
+
+  # JSON path expressions (see https://github.com/Galbar/JsonPath-PHP) are used to parse the JSON data from Qi
+  # ResourceSpace field are on the left, Qi JSONPath on the right
+  # Some fields require filtering (see method 'filter' in src/Qi/Qi.php)
+  # All fields have no mapping by default (use the value as-is) and have the following defaults, which can be overwritten where needed:
+  #   type: string (multiple strings are concatenated by comma)
+  #   overwrite: yes (overwrite any existing data in ResourceSpace)
+  #   node_value: no (the value is not taken from a predefined list of options)
+  mapping:
+    # Fields that go from Qi to ResourceSpace
+    qi_to_resourcespace:
+      title:
+        path: "$.relationship.object_title[?(@.details.language_id_name == 'Nederlands')].name"
+      description:
+        path: "$.relationship.object_description[?(@.details.language_id_name == 'Nederlands')].name"
+      creator:
+        path: "$.relationship.object_maker[*].name"
+      artworkdate:
+        path: "$.relationship.object_production[?(@.details.object_production_type_id_name == 'Vervaardiging')].details[date_from, date_to]"
+        type: date_range
+      keywords:
+        path: "$.relationship.object_keyword[*].name"
+      rightsstatements:
+        path: "$.ipr_status_value"
+        node_value: yes
+        mapping:
+          Publiek domein: ''
+          Geen auteursrechtelijke beperkingen bekend: 'No Known Copyright'
+          Auteursrechtelijk beschermd: 'In Copyright'
+          Auteursrechtelijk beschermd - Rechthebbende(n) niet-lokaliseerbaar of niet-identificeerbaar: 'In Copyright - Rights-holder(s) Unlocatable or Unidentifiable'
+          Auteursrechtelijk beschermd - EU verweesd werk: 'Alle rechten voorbehouden - EU Orphan Work'
+      license:
+        path: "$.ipr_status_value"
+        node_value: yes
+        mapping:
+          Publiek domein: 'Publiek domein'
+          Geen auteursrechtelijke beperkingen bekend: 'Onbekend'
+          Auteursrechtelijk beschermd: 'Alle rechten voorbehouden'
+          Auteursrechtelijk beschermd - Rechthebbende(n) niet-lokaliseerbaar of niet-identificeerbaar: 'Alle rechten voorbehouden'
+          Auteursrechtelijk beschermd - EU verweesd werk: 'Alle rechten voorbehouden'
+      internalnote:
+        path: "$.rights_statement"
+        overwrite: no
+
+    # Fields that go from ResourceSpace to Qi
+    resourcespace_to_qi: []
