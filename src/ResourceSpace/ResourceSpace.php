@@ -2,10 +2,6 @@
 
 namespace App\ResourceSpace;
 
-use App\Util\DateTimeUtil;
-use App\Util\HttpUtil;
-use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
-
 class ResourceSpace
 {
     private $apiUrl;
@@ -59,11 +55,8 @@ class ResourceSpace
         return json_decode($data, true);
     }
 
-    public function updateField($id, $field, $value, $nodeValue = false, $prependTimestamp = false)
+    public function updateField($id, $field, $value, $nodeValue = false)
     {
-        if($prependTimestamp) {
-            $value = DateTimeUtil::formatTimestampSimple() . ' - ' . $value;
-        }
         $data = $this->doApiCall('update_field&param1=' . $id . '&param2=' . $field . "&param3=" . urlencode($value) . '&param4=' . $nodeValue);
         return json_decode($data, true);
     }
