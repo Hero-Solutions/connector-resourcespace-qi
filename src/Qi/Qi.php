@@ -2,8 +2,6 @@
 
 namespace App\Qi;
 
-use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
-
 class Qi
 {
     private $baseUrl;
