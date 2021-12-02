@@ -2,6 +2,9 @@
 
 namespace App\Qi;
 
+use JsonPath\InvalidJsonException;
+use JsonPath\JsonObject;
+
 class Qi
 {
     private $baseUrl;
@@ -23,52 +26,113 @@ class Qi
         $this->sslCertificateAuthorityFile = $sslCertificateAuthority['authority_file'];
     }
 
-    public static function filterResults($results, $fieldName, $field, $resourceData) {
-        $res = null;
-        if(is_string($results)) {
-            $results = [ self::filterField($results) ];
-        }
-        if(is_array($results)) {
-            if(count($results) > 0) {
-                if (array_key_exists('type', $field)) {
-                    switch ($field['type']) {
-                        case 'date_range':
-                            if (count($results) === 2) {
-                                $results[0] = Qi::filterField($results[0]);
-                                if (!preg_match('/^[0-9]{1,4}-[0-9][0-9]-[0-9][0-9]$/', $results[0])) {
-                                    if (preg_match('/^[0-9]{1,4}$/', $results[0])) {
-                                        $results[0] = $results[0] . '-01-01';
-                                    }
-                                }
-                                $results[1] = Qi::filterField($results[1]);
-                                if (!preg_match('/^[0-9]{1,4}-[0-9][0-9]-[0-9][0-9]$/', $results[1])) {
-                                    if (preg_match('/^[0-9]{1,4}$/', $results[1])) {
-                                        $results[1] = $results[1] . '-12-31';
-                                    }
-                                }
-                                if (preg_match('/^[0-9]{1,4}-[0-9][0-9]-[0-9][0-9]$/', $results[0])
-                                    && preg_match('/^[0-9]{1,4}-[0-9][0-9]-[0-9][0-9]$/', $results[1])) {
-                                    $res = $results[0] . ',' . $results[1];
-                                }
-                            } else if (count($results) === 1) {
-                                $results[0] = Qi::filterField($results[0]);
-                                if (!preg_match('/^[0-9]{1,4}-[0-9][0-9]-[0-9][0-9]$/', $results[0])) {
-                                    if (preg_match('/^[0-9]{1,4}$/', $results[0])) {
-                                        $results[0] = $results[0] . '-01-01,' . $results[0] . '-12-31';
-                                    }
+    public static function getField($jsonObject, $fieldName, $field, $resourceData) {
+        if(array_key_exists('type', $field)) {
+            if($field['type'] === 'list') {
+                if(!array_key_exists('parent_path', $field) || !array_key_exists('paths', $field)) {
+                    echo 'Error: missing "parent_path" or "paths" for type "date_range" (field "' . $fieldName . '").' . PHP_EOL;
+                    return null;
+                } else {
+                    $parentObjects = self::resultsToArray($jsonObject->get($field['parent_path']));
+                    $results = [];
+                    foreach($parentObjects as $parentObject) {
+                        try {
+                            $object = new JsonObject($parentObject);
+                        } catch (InvalidJsonException $e) {
+                            echo 'JSONPath error: ' . $e->getMessage() . PHP_EOL;
+                        }
+                        $res = null;
+                        foreach($field['paths'] as $path) {
+                            $childResults = self::resultsToArray($object->get($path));
+                            foreach($childResults as $childResult) {
+                                if($res == null) {
+                                    $res = $childResult;
                                 } else {
-                                    $res = $results[0] . ',' . $results[0];
+                                    $res = $res . ': ' . $childResult;
                                 }
-                            } else {
-                                //TODO sometimes, there are two 'from' and 'to' dates. What do we want to do with these?
                             }
-                            break;
+                        }
+                        if($res != null) {
+                            $results[] = $res;
+                        }
                     }
-                } else if (array_key_exists('mapping', $field)) {
+                    $res = null;
+                    foreach($results as $result) {
+                        $result = self::filterField($result);
+                        if($res == null) {
+                            $res = $result;
+                        } else {
+                            $res = $res . '\n\n' . $result;
+                        }
+                    }
+                    return $res;
+                }
+            } else if($field['type'] == 'date_range') {
+                if(!array_key_exists('from_date_path', $field) || !array_key_exists('to_date_path', $field)) {
+                    echo 'Error: missing "from_date_path" or "to_date_path" for type "date_range" (field "' . $fieldName . '").' . PHP_EOL;
+                    return null;
+                } else {
+                    $fromDates = self::resultsToArray($jsonObject->get($field['from_date_path']));
+                    $toDates = self::resultsToArray($jsonObject->get($field['to_date_path']));
+                    if (empty($fromDates)) {
+                        if (empty($toDates)) {
+                            return null;
+                        } else {
+                            $fromDates = $toDates;
+                        }
+                    } else if(empty($toDates)) {
+                        $toDates = $fromDates;
+                    }
+                    $fromDatesList = [];
+                    $toDatesList = [];
+                    foreach ($fromDates as $date) {
+                        $date = self::filterField($date);
+                        if (!preg_match('/^[0-9]{1,4}-[0-9][0-9]-[0-9][0-9]$/', $date)) {
+                            if (preg_match('/^[0-9]{1,4}$/', $date)) {
+                                $date = $date . '-01-01';
+                            }
+                        }
+                        while (strlen($date) < 10) {
+                            $date = '0' . $date;
+                        }
+                        $fromDatesList[] = $date;
+                    }
+                    foreach ($toDates as $date) {
+                        $date = self::filterField($date);
+                        if (!preg_match('/^[0-9]{1,4}-[0-9][0-9]-[0-9][0-9]$/', $date)) {
+                            if (preg_match('/^[0-9]{1,4}$/', $date)) {
+                                $date = $date . '-12-31';
+                            }
+                        }
+                        while (strlen($date) < 10) {
+                            $date = '0' . $date;
+                        }
+                        $toDatesList[] = $date;
+                    }
+                    sort($fromDatesList);
+                    rsort($toDatesList);
+
+                    if(count($fromDatesList) > 1 || count($toDatesList) > 1) {
+                        echo '' . PHP_EOL . PHP_EOL;
+                        var_dump($fromDates);
+                        var_dump($toDates);
+                        var_dump($fromDatesList);
+                        var_dump($toDatesList);
+                    }
+                    return $fromDatesList[0] . ',' . $toDatesList[0];
+                }
+            } else {
+                echo 'Error: Unknown type "' . $field['type'] . '" for field "' . $fieldName . '"".' . PHP_EOL;
+            }
+        }
+        if(array_key_exists('path', $field)) {
+            $results = self::resultsToArray($jsonObject->get($field['path']));
+            if(count($results) > 0) {
+                if (array_key_exists('mapping', $field)) {
                     if (array_key_exists($results[0], $field['mapping'])) {
                         $res = $field['mapping'][$results[0]];
                     } else {
-                        echo 'Unknown ' . $fieldName . ': ' . $results[0] . PHP_EOL;
+                        echo 'Unknown mapping for ' . $fieldName . ': ' . $results[0] . PHP_EOL;
                     }
                 } else {
                     $res = self::filterField(implode(',', $results));
@@ -82,8 +146,21 @@ class Qi
                     }
                 }
             }
+            return $res;
+        } else {
+            return null;
         }
-        return $res;
+        return null;
+    }
+
+    private static function resultsToArray($results) {
+        if(is_string($results)) {
+            return [ $results ];
+        }
+        if(is_array($results)) {
+            return $results;
+        }
+        return [];
     }
 
     public static function filterField($field) {

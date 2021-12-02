@@ -109,26 +109,22 @@ class TestCommand extends Command
                 }
 
                 try {
-                    if(property_exists($object, 'relationship')) {
-//                        echo $object->id . PHP_EOL;
-                        $jsonObject = new JsonObject($object);
-                        foreach ($qiToRS as $fieldName => $field) {
-                            $results = $jsonObject->get($field['path']);
-                            $res = Qi::filterResults($results, $fieldName, $field, $resourceData);
-                            if($res != null) {
-                                $nodeValue = false;
-                                if(array_key_exists('node_value', $field)) {
-                                    if($field['node_value'] === 'yes') {
-                                        $nodeValue = true;
-                                    }
+                    $jsonObject = new JsonObject($object);
+                    foreach ($qiToRS as $fieldName => $field) {
+                        $res = Qi::getField($jsonObject, $fieldName, $field, $resourceData);
+                        if($res != null) {
+                            $nodeValue = false;
+                            if(array_key_exists('node_value', $field)) {
+                                if($field['node_value'] === 'yes') {
+                                    $nodeValue = true;
                                 }
-//                                $this->resourceSpace->updateField($resourceId, $fieldName, $res, $nodeValue);
-//                                echo $fieldName . ' - ' . $res . PHP_EOL;
                             }
+//                                $this->resourceSpace->updateField($resourceId, $fieldName, $res, $nodeValue);
+                                echo $fieldName . ' - ' . $res . PHP_EOL;
                         }
                     }
                 } catch (InvalidJsonException $e) {
-                     echo 'JSOnPath error: ' . $e->getMessage() . PHP_EOL;
+                     echo 'JSONPath error: ' . $e->getMessage() . PHP_EOL;
                 }
             }
 //            echo $filename . PHP_EOL;
