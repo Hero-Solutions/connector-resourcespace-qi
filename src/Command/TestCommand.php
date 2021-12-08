@@ -69,10 +69,10 @@ class TestCommand extends Command
             $inventoryNumber = $resourceInfo[$rsFields['inventory_number']];
             if(array_key_exists($inventoryNumber, $allObjects)) {
                 $resourceId = $resourceInfo['ref'];
-                $resourceData = $this->resourceSpace->getResourceData($resourceId);
-                $allResourceData[$resourceId] = $resourceData;
+//                $resourceData = $this->resourceSpace->getResourceData($resourceId);
+//                $allResourceData[$resourceId] = $resourceData;
                 $object = $allObjects[$inventoryNumber];
-                $objectName = Qi::filterField($object->name);
+                $objectName = $this->qi->filterField($object->name);
                 $recordsMatched[] = $inventoryNumber;
                 $rsFilename = $resourceInfo[$rsFields['filename']];
                 $upload = true;
@@ -110,8 +110,9 @@ class TestCommand extends Command
 
                 try {
                     $jsonObject = new JsonObject($object);
+                    echo $object->id . PHP_EOL;
                     foreach ($qiToRS as $fieldName => $field) {
-                        $res = Qi::getField($jsonObject, $fieldName, $field, $resourceData);
+                        $res = $this->qi->getField($jsonObject, $fieldName, $field, []);
                         if($res != null) {
                             $nodeValue = false;
                             if(array_key_exists('node_value', $field)) {
@@ -120,9 +121,10 @@ class TestCommand extends Command
                                 }
                             }
 //                                $this->resourceSpace->updateField($resourceId, $fieldName, $res, $nodeValue);
-                                echo $fieldName . ' - ' . $res . PHP_EOL;
+                            echo $fieldName . ' - ' . $res . PHP_EOL;
                         }
                     }
+                    echo PHP_EOL . PHP_EOL;
                 } catch (InvalidJsonException $e) {
                      echo 'JSONPath error: ' . $e->getMessage() . PHP_EOL;
                 }
@@ -140,7 +142,7 @@ class TestCommand extends Command
                 $write = true;
                 if(property_exists($allObjects[$inventoryNumber], 'media')) {
                     $object = $allObjects[$inventoryNumber];
-                    $objectName = Qi::filterField($object->name);
+                    $objectName = $this->qi->filterField($object->name);
                     if(!empty($object->media)) {
                         if (property_exists($object->media, 'image')) {
                             if(!empty($object->media->image)) {

@@ -25,22 +25,25 @@ parameters:
     override: false
     authority_file: '/path/to/cacert.pem'
 
-  # JSON path expressions (see https://github.com/Galbar/JsonPath-PHP) are used to parse the JSON data from Qi
-  # ResourceSpace field are on the left, Qi JSONPath on the right
-  # Some fields require filtering (see method 'filter' in src/Qi/Qi.php)
+  # 'path', 'parent_path', 'key_path' and 'value_path' are JSON path expressions (see https://github.com/Galbar/JsonPath-PHP) used to parse the JSON data from Qi
   # There is no mapping by default, override by setting the 'mapping' property. Possible values for all properties:
   #   type:
-  #     (default) - take the value(s) as-is, multiple strings are concatenated by ','
-  #     list - for each 'parent_path', the different values in 'paths' are concatenated by ': ', each element is separated by two newlines
-  #     filter_from_list - same as list, but apply a filter to only
-  #     date_range - requires a 'from_date_path' and 'to_date_path', concatenates the lowest from date and the highest to date (YYYY/MM/DD,YYYY/MM/DD). Years without months and days are postfixed by -01-01 for the earliest year and -12-31 for the latest year.
+  #     (default) - take the value(s) as obtained from Qi through the 'path' expression as-is. Multiple strings are concatenated by ','
+  #     list - for each 'parent_path', execute a 'key_path' and 'value_path' expression to obtain key-value pairs, concatenated by ': '. Each element is separated by two newlines. An optional 'key_filter' can be applied to filter out only the keys from the 'key_path' that we want.
+  #     date_range - requires a 'from_date_path' and 'to_date_path'. Concatenates the lowest from_date and the highest to_date (in YYYY/MM/DD,YYYY/MM/DD format). Unknown values are postfixed by the earliest possible date for from_date (000-01-01) and by the latest possible date for to_date (999-12-31).
   #   overwrite:
   #     (default) - overwrite any existing data in ResourceSpace
-  #     no - do not overwrite any date in ResourceSpace
-  #     merge - merge the Qi and ResourceSpace values together if the Qi value does not occur in the ResourceSpace value yet
+  #     no - do not overwrite any date in ResourceSpace if there is already data in this field in ResourceSpace
+  #     merge - merge the Qi and ResourceSpace values together if the Qi value does not occur in the ResourceSpace field yet
   #   node_value:
   #     (default) - the value is not taken from a predefined list of options in ResourceSpace
   #     yes - the value is taken from a predefined list of options in ResourceSpace
+  #   casing:
+  #     (default) - do nothing, leave value as-is
+  #     lowercase - lowercase everything
+  #   mapping:
+  #     (default) - do nothing, leave value as-is
+  #     (defined list) - map the values from Qi to ResourceSpace (Qi value on the left, ResourceSpace value to the right). Qi values not mapped are not written to ResourceSpace.
   mapping:
     # Fields that go from Qi to ResourceSpace
     qi_to_resourcespace:
@@ -49,21 +52,34 @@ parameters:
       description:
         type: list
         parent_path: "$.relationship.object_description[?(@.details.language_id_name == 'Nederlands')]"
-        paths:
-          - '$.details.object_description_type_id_name'
-          - '$.name'
+        key_path: '$.details.object_description_type_id_name'
+        value_path: '$.name'
+        key_filter:
+          - 'Algemene beschrijving'
+          - 'Fysieke beschrijving'
+          - 'Inhoudelijke beschrijving'
+          - 'Presentatie (zaalttekst, uitgebreid identifcatielabel, audioguide, IPad)'
+          - 'Publieksgerichte content'
       artworkcreator:
         type: list
         parent_path: "$.relationship.object_maker[*]"
-        paths:
-          - '$.details.actor_role_id_name'
-          - '$.name'
+        key_path: '$.details.actor_role_id_name'
+        value_path: '$.name'
+        key_filter:
+          - 'Graveur'
+          - 'Illustrator'
+          - 'Ontwerper'
+          - 'Ontwerper-iconografie'
+          - 'Toegeschreven aan'
+          - 'Vervaardiger'
+          - 'Vervaardigerbis'
       artworkdate:
         type: date_range
         from_date_path: "$.relationship.object_production[?(@.details.object_production_type_id_name == 'Vervaardiging')].details[date_from]"
         to_date_path: "$.relationship.object_production[?(@.details.object_production_type_id_name == 'Vervaardiging')].details[date_to]"
       keywords:
         path: "$.relationship.object_keyword[*].name"
+        casing: lowercase
       rightsstatements:
         node_value: yes
         path: "$.ipr_status_value"

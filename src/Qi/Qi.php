@@ -13,6 +13,7 @@ class Qi
     private $getFields;
     private $overrideCertificateAuthorityFile;
     private $sslCertificateAuthorityFile;
+    private $unknownMappings = [];
 
     public function __construct($qi, $sslCertificateAuthority)
     {
@@ -26,11 +27,12 @@ class Qi
         $this->sslCertificateAuthorityFile = $sslCertificateAuthority['authority_file'];
     }
 
-    public static function getField($jsonObject, $fieldName, $field, $resourceData) {
+    public function getField($jsonObject, $fieldName, $field, $resourceData) {
+        $res = null;
         if(array_key_exists('type', $field)) {
             if($field['type'] === 'list') {
-                if(!array_key_exists('parent_path', $field) || !array_key_exists('paths', $field)) {
-                    echo 'Error: missing "parent_path" or "paths" for type "date_range" (field "' . $fieldName . '").' . PHP_EOL;
+                if(!array_key_exists('parent_path', $field) || !array_key_exists('key_path', $field) || !array_key_exists('value_path', $field)) {
+                    echo 'Error: missing "parent_path", "key_path" or "value_path" for type "list" (field "' . $fieldName . '").' . PHP_EOL;
                     return null;
                 } else {
                     $parentObjects = self::resultsToArray($jsonObject->get($field['parent_path']));
@@ -42,13 +44,18 @@ class Qi
                             echo 'JSONPath error: ' . $e->getMessage() . PHP_EOL;
                         }
                         $res = null;
-                        foreach($field['paths'] as $path) {
-                            $childResults = self::resultsToArray($object->get($path));
-                            foreach($childResults as $childResult) {
-                                if($res == null) {
-                                    $res = $childResult;
-                                } else {
-                                    $res = $res . ': ' . $childResult;
+                        $keyResults = self::resultsToArray($object->get($field['key_path']));
+                        if(!empty($keyResults)) {
+                            $key = self::filterField($keyResults[0]);
+                            if(array_key_exists('key_filter', $field)) {
+                                if(!in_array($key, $field['key_filter'])) {
+                                    $key = null;
+                                }
+                            }
+                            if($key !== null) {
+                                $valueResults = self::resultsToArray($object->get($field['value_path']));
+                                if(!empty($valueResults)) {
+                                    $res = $key . ': ' . self::filterField($valueResults[0]);
                                 }
                             }
                         }
@@ -72,8 +79,20 @@ class Qi
                     echo 'Error: missing "from_date_path" or "to_date_path" for type "date_range" (field "' . $fieldName . '").' . PHP_EOL;
                     return null;
                 } else {
-                    $fromDates = self::resultsToArray($jsonObject->get($field['from_date_path']));
-                    $toDates = self::resultsToArray($jsonObject->get($field['to_date_path']));
+                    $fromDatesRes = self::resultsToArray($jsonObject->get($field['from_date_path']));
+                    $toDatesRes = self::resultsToArray($jsonObject->get($field['to_date_path']));
+                    $fromDates = [];
+                    $toDates = [];
+                    foreach($fromDatesRes as $date) {
+                        if(strlen($date) > 0) {
+                            $fromDates[] = $date;
+                        }
+                    }
+                    foreach($toDatesRes as $date) {
+                        if(strlen($date) > 0) {
+                            $toDates[] = $date;
+                        }
+                    }
                     if (empty($fromDates)) {
                         if (empty($toDates)) {
                             return null;
@@ -86,74 +105,130 @@ class Qi
                     $fromDatesList = [];
                     $toDatesList = [];
                     foreach ($fromDates as $date) {
-                        $date = self::filterField($date);
+                        $date = str_replace('/__', '', $date);
                         if (!preg_match('/^[0-9]{1,4}-[0-9][0-9]-[0-9][0-9]$/', $date)) {
-                            if (preg_match('/^[0-9]{1,4}$/', $date)) {
+                            if (preg_match('/^[0-9]{1,4}\/[0-9][0-9]\/[0-9][0-9]$/', $date)) {
+                                $date = str_replace('/', '-', $date);
+                            } else if (preg_match('/^[0-9]{1,4}\/[0-9][0-9]$/', $date)) {
+                                $month = substr($date, -2);
+                                $year = substr(0, strpos($date, '/'));
+                                $date = $date . '-01';
+                            } else if (preg_match('/^[0-9]{1,4}___$/', $date)) {
+                                $date = $date . '000-01-01';
+                            } else if (preg_match('/^[0-9]{1,4}__$/', $date)) {
+                                $date = $date . '00-01-01';
+                            } else if (preg_match('/^[0-9]{1,4}_$/', $date)) {
+                                $date = $date . '0-01-01';
+                            } else if (preg_match('/^[0-9]{1,4}$/', $date)) {
                                 $date = $date . '-01-01';
+                            } else {
+                                echo 'Unknown date: "' . $date . '"' . PHP_EOL;
+                                $date = null;
                             }
                         }
-                        while (strlen($date) < 10) {
-                            $date = '0' . $date;
+                        if($date != null) {
+                            while (strlen($date) < 10) {
+                                $date = '0' . $date;
+                            }
+                            if (preg_match('/^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$/', $date)) {
+                                $fromDatesList[] = $date;
+                            }
                         }
-                        $fromDatesList[] = $date;
                     }
                     foreach ($toDates as $date) {
-                        $date = self::filterField($date);
+                        $date = str_replace('/__', '', $date);
                         if (!preg_match('/^[0-9]{1,4}-[0-9][0-9]-[0-9][0-9]$/', $date)) {
-                            if (preg_match('/^[0-9]{1,4}$/', $date)) {
+                            if (preg_match('/^[0-9]{1,4}\/[0-9][0-9]\/[0-9][0-9]$/', $date)) {
+                                $date = str_replace('/', '-', $date);
+                            } else if (preg_match('/^[0-9]{1,4}\/[0-9][0-9]$/', $date)) {
+                                $month = substr($date, -2);
+                                $year = substr(0, strpos($date, '/'));
+                                $date = $date . '-' . $this->getMaxDaysInMonth($year, $month);
+                            } else if (preg_match('/^[0-9]{1,4}___$/', $date)) {
+                                $date = $date . '999-12-31';
+                            } else if (preg_match('/^[0-9]{1,4}__$/', $date)) {
+                                $date = $date . '99-12-31';
+                            } else if (preg_match('/^[0-9]{1,4}_$/', $date)) {
+                                $date = $date . '9-12-31';
+                            } else if (preg_match('/^[0-9]{1,4}$/', $date)) {
                                 $date = $date . '-12-31';
+                            } else {
+                                echo 'Unknown date: "' . $date . '"' . PHP_EOL;
+                                $date = null;
                             }
                         }
-                        while (strlen($date) < 10) {
-                            $date = '0' . $date;
+                        if($date != null) {
+                            while (strlen($date) < 10) {
+                                $date = '0' . $date;
+                            }
+                            if (preg_match('/^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$/', $date)) {
+                                $toDatesList[] = $date;
+                            }
                         }
-                        $toDatesList[] = $date;
                     }
                     sort($fromDatesList);
                     rsort($toDatesList);
 
-                    if(count($fromDatesList) > 1 || count($toDatesList) > 1) {
-                        echo '' . PHP_EOL . PHP_EOL;
-                        var_dump($fromDates);
-                        var_dump($toDates);
-                        var_dump($fromDatesList);
-                        var_dump($toDatesList);
+                    if(!empty($fromDatesList) && !empty($toDatesList)) {
+                        return $fromDatesList[0] . ',' . $toDatesList[0];
                     }
-                    return $fromDatesList[0] . ',' . $toDatesList[0];
                 }
             } else {
                 echo 'Error: Unknown type "' . $field['type'] . '" for field "' . $fieldName . '"".' . PHP_EOL;
             }
         }
         if(array_key_exists('path', $field)) {
-            $results = self::resultsToArray($jsonObject->get($field['path']));
+            $results = $this->resultsToArray($jsonObject->get($field['path']));
             if(count($results) > 0) {
                 if (array_key_exists('mapping', $field)) {
                     if (array_key_exists($results[0], $field['mapping'])) {
                         $res = $field['mapping'][$results[0]];
                     } else {
-                        echo 'Unknown mapping for ' . $fieldName . ': ' . $results[0] . PHP_EOL;
+                        if(!array_key_exists($fieldName, $this->unknownMappings)) {
+                            $this->unknownMappings[$fieldName] = [];
+                        }
+                        if(!in_array($results[0], $this->unknownMappings[$fieldName])) {
+                            $this->unknownMappings[$fieldName][] = $results[0];
+                            echo 'INFO: Unknown mapping for ' . $fieldName . ': ' . $results[0] . PHP_EOL;
+                        }
                     }
                 } else {
-                    $res = self::filterField(implode(',', $results));
+                    $res = $this->filterField(implode(',', $results));
                 }
             }
-            if($res != null && array_key_exists('overwrite', $field)) {
-                if($field['overwrite'] === 'no' && array_key_exists($fieldName, $resourceData)) {
-                    if(!empty($resourceData[$fieldName])) {
-                        echo 'NO OVERWRITE ' . $res . PHP_EOL;
+        }
+        if($res !== null) {
+            if(strlen($res) === 0) {
+                $res = null;
+            }
+        }
+        if($res !== null && array_key_exists('casing', $field)) {
+            if($field['casing'] === 'lowercase') {
+                $res = strtolower($res);
+            }
+        }
+        if($res !== null && array_key_exists('overwrite', $field) && array_key_exists($fieldName, $resourceData)) {
+            if($field['overwrite'] === 'no') {
+                if(!empty($resourceData[$fieldName])) {
+                    echo 'Not overwriting field ' . $fieldName . ' for res ' . $res . ' (already has ' . $resourceData[$fieldName] . ')' . PHP_EOL;
+                    $res = null;
+                }
+            } else if($field['overwrite'] === 'merge') {
+                if(!empty($resourceData[$fieldName])) {
+                    if(strpos($resourceData[$fieldName], $res) === false) {
+                        echo 'Merging field ' . $fieldName . ' for res ' . $res . ' (already has ' . $resourceData[$fieldName] . ')' . PHP_EOL;
+                        $res = $resourceData[$fieldName] . '\n\n' . $res;
+                    } else {
+                        echo 'Not merging field ' . $fieldName . ' for res ' . $res . ' (already has ' . $resourceData[$fieldName] . ')' . PHP_EOL;
                         $res = null;
                     }
                 }
             }
-            return $res;
-        } else {
-            return null;
         }
-        return null;
+        return $res;
     }
 
-    private static function resultsToArray($results) {
+    private function resultsToArray($results) {
         if(is_string($results)) {
             return [ $results ];
         }
@@ -163,12 +238,40 @@ class Qi
         return [];
     }
 
-    public static function filterField($field) {
+    public function filterField($field) {
         $field = str_replace("<i>", '', $field);
         $field = str_replace("</i>", '', $field);
         $field = str_replace("\n", ' ', $field);
-        $field = str_replace("/__/__", '', $field);
         return $field;
+    }
+
+    public function getMaxDaysInMonth($year, $month) {
+        switch($month) {
+            default:
+            case '01':
+            case '03':
+            case '05':
+            case '07':
+            case '08':
+            case '10':
+            case '12':
+                return '31';
+            case '02':
+                if ($year % 400 == 0) {
+                    return '29';
+                } elseif ($year % 100 == 0) {
+                    return '28';
+                } elseif ($year % 4 == 0) {
+                    return '29';
+                } else {
+                    return '28';
+                }
+            case '04':
+            case '06':
+            case '09':
+            case '11':
+                return '30';
+        }
     }
 
     public function getAllObjects()
@@ -180,11 +283,15 @@ class Qi
         $count = $objs->count;
         $records = $objs->records;
         foreach($records as $record) {
-            $objects[$record->object_number] = $record;
+            if(!empty($record->object_number)) {
+                $objects[$record->object_number] = $record;
+            } else {
+                echo 'Error: Qi record ' . $record->id . ' has no inventory number' . PHP_EOL;
+            }
         }
-        //TODO remove the $i < 1, this is to only grab a few records without it being too slow
-        for($i = 1; $i < ($count + 499) / 500 - 1 && false; $i++) {
-            $objsJson = $this->get($this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields) . '/' . ($i * 500));
+        //TODO remove the ' && false', this is to only grab a few records without it being too slow
+        for($i = 1; $i < ($count + 499) / 500 - 1/* && false*/; $i++) {
+            $objsJson = $this->get($this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields) . '/_offset/' . ($i * 500));
             $objs = json_decode($objsJson);
             $records = $objs->records;
             foreach($records as $record) {
