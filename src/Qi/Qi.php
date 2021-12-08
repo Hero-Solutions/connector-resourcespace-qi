@@ -308,7 +308,6 @@ class Qi
 
     public function get($url)
     {
-        echo 'GET '. $url . PHP_EOL;
         $ch = curl_init();
         if ($this->overrideCertificateAuthorityFile) {
             curl_setopt($ch,CURLOPT_CAINFO, $this->sslCertificateAuthorityFile);
