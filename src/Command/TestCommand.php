@@ -110,7 +110,7 @@ class TestCommand extends Command
 
                 try {
                     $jsonObject = new JsonObject($object);
-                    echo $object->id . PHP_EOL;
+//                    echo $object->id . PHP_EOL;
                     foreach ($qiToRS as $fieldName => $field) {
                         $res = $this->qi->getField($jsonObject, $fieldName, $field, []);
                         if($res != null) {
@@ -121,10 +121,10 @@ class TestCommand extends Command
                                 }
                             }
 //                                $this->resourceSpace->updateField($resourceId, $fieldName, $res, $nodeValue);
-                            echo $fieldName . ' - ' . $res . PHP_EOL;
+//                            echo $fieldName . ' - ' . $res . PHP_EOL;
                         }
                     }
-                    echo PHP_EOL . PHP_EOL;
+//                    echo PHP_EOL . PHP_EOL;
                 } catch (InvalidJsonException $e) {
                      echo 'JSONPath error: ' . $e->getMessage() . PHP_EOL;
                 }
