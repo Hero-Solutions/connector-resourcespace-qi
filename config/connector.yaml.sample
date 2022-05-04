@@ -1,5 +1,7 @@
 ---
 parameters:
+  test: true
+
   resourcespace:
     api:
       url: ''
@@ -7,46 +9,44 @@ parameters:
       key: ''
     search_query: 'publisher:TEST'
     fields:
-      filename: field51
-      inventory_number: field105
+      originalfilename: field51
+      inventorynumber: field105
       title: field8
-
-  qi:
-    api:
-      url: ''
-      username: ''
-      password: ''
-    get_fields: 'object_number,ipr_status_value,rights_statement,internalnote,relationship'
-
-  # Certificate Authority (also known as 'cacert') may not work on its own depending on your system and PHP configuration,
-  # that's why a cacert.pem is included in this project (from https://curl.haxx.se/docs/caextract.html).
-  # Set override_certificate_authority to 'true' when we need to specify our own cacert.pem (can be a relative path or an absolute system path).
-  ssl_certificate_authority:
-    override: false
-    authority_file: '/path/to/cacert.pem'
-
-  # 'path', 'parent_path', 'key_path' and 'value_path' are JSON path expressions (see https://github.com/Galbar/JsonPath-PHP) used to parse the JSON data from Qi
-  # There is no mapping by default, override by setting the 'mapping' property. Possible values for all properties:
-  #   type:
-  #     (default) - take the value(s) as obtained from Qi through the 'path' expression as-is. Multiple strings are concatenated by ','
-  #     list - for each 'parent_path', execute a 'key_path' and 'value_path' expression to obtain key-value pairs, concatenated by ': '. Each element is separated by two newlines. An optional 'key_filter' can be applied to filter out only the keys from the 'key_path' that we want.
-  #     date_range - requires a 'from_date_path' and 'to_date_path'. Concatenates the lowest from_date and the highest to_date (in YYYY/MM/DD,YYYY/MM/DD format). Unknown values are postfixed by the earliest possible date for from_date (000-01-01) and by the latest possible date for to_date (999-12-31).
-  #   overwrite:
-  #     (default) - overwrite any existing data in ResourceSpace
-  #     no - do not overwrite any date in ResourceSpace if there is already data in this field in ResourceSpace
-  #     merge - merge the Qi and ResourceSpace values together if the Qi value does not occur in the ResourceSpace field yet
-  #   node_value:
-  #     (default) - the value is not taken from a predefined list of options in ResourceSpace
-  #     yes - the value is taken from a predefined list of options in ResourceSpace
-  #   casing:
-  #     (default) - do nothing, leave value as-is
-  #     lowercase - lowercase everything
-  #   mapping:
-  #     (default) - do nothing, leave value as-is
-  #     (defined list) - map the values from Qi to ResourceSpace (Qi value on the left, ResourceSpace value to the right). Qi values not mapped are not written to ResourceSpace.
-  mapping:
-    # Fields that go from Qi to ResourceSpace
-    qi_to_resourcespace:
+      description: field91
+      artworkcreator: field96
+      artworkdate: field110
+      keywords: field90
+      rightsstatements: field146
+      license: field102
+      internalnote: field25
+      copyrightowner: field99
+      credit: field10
+      externalnote: field120
+    full_resource_data:
+      internalnote: field25
+    # 'path', 'parent_path', 'key_path' and 'value_path' are JSON path expressions (see https://github.com/Galbar/JsonPath-PHP) used to parse the JSON data from Qi
+    # There is no mapping by default, override by setting the 'mapping' property. Possible values for all properties:
+    #   type:
+    #     (default) - take the value(s) as obtained from Qi through the 'path' expression as-is. Multiple strings are concatenated by ','
+    #     list - for each 'parent_path', execute a 'key_path' and 'value_path' expression to obtain key-value pairs, concatenated by '\n\n' (can be overwritten by changing 'concat') with the form '$key: $value' (can be overwritten by changing 'format'). Each element is separated by two newlines. An optional 'key_filter' can be applied to filter out only the keys from the 'key_path' that we want.
+    #     date_range - requires a 'from_date_path' and 'to_date_path'. Concatenates the lowest from_date and the highest to_date (in YYYY/MM/DD,YYYY/MM/DD format). Unknown values are postfixed by the earliest possible date for from_date (000-01-01) and by the latest possible date for to_date (999-12-31).
+    #   overwrite:
+    #     (default) - overwrite any existing data in ResourceSpace
+    #     no - do not overwrite any date in ResourceSpace if there is already data in this field in ResourceSpace
+    #     merge - merge the Qi and ResourceSpace values together if the Qi value does not occur in the ResourceSpace field yet
+    #   node_value:
+    #     (default) - the value is not taken from a predefined list of options in ResourceSpace
+    #     yes - the value is taken from a predefined list of options in ResourceSpace
+    #   casing:
+    #     (default) - do nothing, leave value as-is
+    #     lowercase - lowercase everything
+    #   mapping:
+    #     (default) - do nothing, leave value as-is
+    #     (defined list) - map the values from Qi to ResourceSpace (Qi value on the left, ResourceSpace value to the right). Qi values not mapped are not written to ResourceSpace.
+    #  remove_commas:
+    #    (default) - do not remove commas
+    #    yes - remove commas in the results (before joining them together). Applies only to 'list' type
+    import_mapping:
       title:
         path: "$.relationship.object_title[?(@.details.language_id_name == 'Nederlands' and @.details.object_title_type_id_name == 'Hoofdtitel')].name"
       description:
@@ -65,6 +65,9 @@ parameters:
         parent_path: "$.relationship.object_maker[*]"
         key_path: '$.details.actor_role_id_name'
         value_path: '$.name'
+        concat: ','
+        format: '$value ($key)'
+        remove_commas: yes
         key_filter:
           - 'Graveur'
           - 'Illustrator'
@@ -102,5 +105,27 @@ parameters:
         overwrite: merge
         path: "$.rights_statement"
 
-    # Fields that go from ResourceSpace to Qi
-    resourcespace_to_qi: []
+  qi:
+    api:
+      url: ''
+      username: ''
+      password: ''
+    get_fields: 'object_number,ipr_status_value,rights_statement,internalnote,relationship,media.image.id,media.image.media_folder_id,media.image.name,media.image.caption,media.image.credits,media.image.copyright,media.image.link_dams'
+    media_folder:
+      field: media_folder_id
+      id: 563
+    link_dams:
+      field: link_dams
+      prefix: ''
+    import_mapping:
+      name: title
+      caption: externalnote
+      credits: credit
+      copyright: copyrightowner
+
+  # Certificate Authority (also known as 'cacert') may not work on its own depending on your system and PHP configuration,
+  # that's why a cacert.pem is included in this project (from https://curl.haxx.se/docs/caextract.html).
+  # Set override_certificate_authority to 'true' when we need to specify our own cacert.pem (can be a relative path or an absolute system path).
+  ssl_certificate_authority:
+    override: false
+    authority_file: '/path/to/cacert.pem'

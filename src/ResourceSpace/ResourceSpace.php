@@ -71,6 +71,7 @@ class ResourceSpace
     {
         $query = 'user=' . str_replace(' ', '+', $this->apiUsername) . '&function=' . $query;
         $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
+        echo $url . PHP_EOL;
         $data = file_get_contents($url);
         return $data;
     }
