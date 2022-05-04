@@ -114,6 +114,13 @@ class Qi
                     $i++;
                 }
             }
+            if (property_exists($object, 'media.image.filename') && count($object->{'media.image.filename'}) === $count) {
+                $i = 0;
+                foreach ($object->{'media.image.filename'} as $filename) {
+                    $allMediaInfo[$i]['filename'] = $filename;
+                    $i++;
+                }
+            }
             if (property_exists($object, 'media.image.original_filename') && count($object->{'media.image.original_filename'}) === $count) {
                 $i = 0;
                 foreach ($object->{'media.image.original_filename'} as $originalFilename) {
@@ -191,7 +198,7 @@ class Qi
             }
         } else {
             foreach($this->creditConfig['languages'] as $language) {
-                $record[$this->creditConfig['qi_field_prefix'] . $language] = '';
+                $record[$this->creditConfig['qi_field_prefix'] . '_' . $language] = '';
             }
         }
 
@@ -232,28 +239,28 @@ class Qi
                     if(array_key_exists($fieldName, $rsFullDataFields)) {
                         $fullRSData = $resourceSpace->getResourceData($resourceId);
                         if(array_key_exists($fieldName, $fullRSData)) {
-                            $resourceInfo[$rsFullDataFields[$fieldName]] = $fullRSData[$fieldName];
+                            $resource[$rsFullDataFields[$fieldName]] = $fullRSData[$fieldName];
                         }
                     }
                     $fieldId = $rsFields[$fieldName];
-                    if(array_key_exists('overwrite', $field) && array_key_exists($fieldId, $resourceInfo)) {
+                    if(array_key_exists('overwrite', $field) && array_key_exists($fieldId, $resource)) {
                         if($field['overwrite'] === 'no') {
-                            if(!empty($resourceData[$fieldId])) {
+                            if(!empty($resource[$fieldId])) {
                                 if($this->debug) {
-                                    echo 'Not overwriting field ' . $fieldName . ' for res ' . $res . ' (already has ' . $resourceData[$fieldId] . ')' . PHP_EOL;
+                                    echo 'Not overwriting field ' . $fieldName . ' for res ' . $res . ' (already has ' . $resource[$fieldId] . ')' . PHP_EOL;
                                 }
                                 $res = null;
                             }
                         } else if($field['overwrite'] === 'merge') {
-                            if(!empty($resourceData[$fieldId])) {
-                                if(strpos($resourceData[$fieldId], $res) === false) {
+                            if(!empty($resource[$fieldId])) {
+                                if(strpos($resource[$fieldId], $res) === false) {
                                     if($this->debug) {
-                                        echo 'Merging field ' . $fieldName . ' for res ' . $res . ' (already has ' . $resourceData[$fieldId] . ')' . PHP_EOL;
+                                        echo 'Merging field ' . $fieldName . ' for res ' . $res . ' (already has ' . $resource[$fieldId] . ')' . PHP_EOL;
                                     }
-                                    $res = $resourceData[$fieldId] . '\n\n' . $res;
+                                    $res = $resource[$fieldId] . '\n\n' . $res;
                                 } else {
                                     if($this->debug) {
-                                        echo 'Not merging field ' . $fieldName . ' for res ' . $res . ' (already has ' . $resourceData[$fieldId] . ')' . PHP_EOL;
+                                        echo 'Not merging field ' . $fieldName . ' for res ' . $res . ' (already has ' . $resource[$fieldId] . ')' . PHP_EOL;
                                     }
                                     $res = null;
                                 }
@@ -261,17 +268,22 @@ class Qi
                         }
                     }
                     if($res !== null) {
-                        $nodeValue = false;
-                        if (array_key_exists('node_value', $field)) {
-                            if ($field['node_value'] === 'yes') {
-                                $nodeValue = true;
+                        $update = true;
+                        if(array_key_exists($fieldId, $resource)) {
+                            if($resource[$fieldId] === $res) {
+                                $update = false;
                             }
                         }
-                        if (!$this->test || $resourceId === '149565') {
-                            if($this->debug) {
-                                echo $fieldName . ' - ' . $res . PHP_EOL;
+                        if($update) {
+                            $nodeValue = false;
+                            if (array_key_exists('node_value', $field)) {
+                                if ($field['node_value'] === 'yes') {
+                                    $nodeValue = true;
+                                }
                             }
-                            $resourceSpace->updateField($resourceId, $fieldName, $res, $nodeValue);
+                            if (!$this->test || $resourceId === '149565') {
+                                $resourceSpace->updateField($resourceId, $fieldName, $res, $nodeValue);
+                            }
                         }
                     }
                 }
@@ -301,7 +313,7 @@ class Qi
             $split = $newSplit;
         }
         $translatedCredit = [];
-        $qiFieldPrefix = $this->creditConfig['qi_field_prefix'];
+        $qiFieldPrefix = $this->creditConfig['qi_field_prefix'] . '_';
         foreach($this->creditConfig['languages'] as $language) {
             $translatedCredit[$qiFieldPrefix . $language] = '';
         }
