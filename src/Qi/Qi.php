@@ -13,6 +13,7 @@ class Qi
     private $getFields;
     private $overrideCertificateAuthorityFile;
     private $sslCertificateAuthorityFile;
+    private $creditConfig;
     private $test;
     private $debug;
     private $update;
@@ -21,7 +22,7 @@ class Qi
     private $objectsByObjectId;
     private $objectsByInventoryNumber;
 
-    public function __construct($qi, $sslCertificateAuthority, $test, $debug, $update)
+    public function __construct($qi, $sslCertificateAuthority, $creditConfig, $test, $debug, $update)
     {
         $qiApi = $qi['api'];
         $this->baseUrl = $qiApi['url'];
@@ -31,6 +32,7 @@ class Qi
 
         $this->overrideCertificateAuthorityFile = $sslCertificateAuthority['override'];
         $this->sslCertificateAuthorityFile = $sslCertificateAuthority['authority_file'];
+        $this->creditConfig = $creditConfig;
 
         $this->test = $test;
         $this->debug = $debug;
@@ -84,7 +86,7 @@ class Qi
         }
     }
 
-    public function getMediaInfos($object, $qiMediaFolderId, $qiImportMapping, $qiMappingToSelf)
+    public function getMediaInfos($object, $qiImportMapping, $qiMappingToSelf)
     {
         $mediaInfos = [];
         if(property_exists($object, 'media.image.id')) {
@@ -138,50 +140,62 @@ class Qi
                 }
             }
             for ($i = 0; $i < $count; $i++) {
-                if($allMediaInfo[$i]['media_folder_id'] === $qiMediaFolderId) {
-                    $mediaInfos[] = $allMediaInfo[$i];
-                }
+                $mediaInfos[] = $allMediaInfo[$i];
             }
         }
         return $mediaInfos;
     }
 
-    public function getMatchingUnlinkedImage($mediaInfos, $originalFilename, $qiLinkDamsPrefix)
+    public function getMatchingImageToBeLinked($images, $originalFilename, $qiMediaFolderId)
     {
         $result = null;
-        foreach($mediaInfos as $mediaInfo) {
-            if(array_key_exists('link_dams', $mediaInfo)) {
-                if(strpos($mediaInfo['link_dams'], $qiLinkDamsPrefix) === 0) {
-                    continue;
-                }
-            }
-            if(array_key_exists('original_filename', $mediaInfo)) {
-                if($mediaInfo['original_filename'] === $originalFilename) {
-                    $result = $mediaInfo;
-                    break;
+        foreach($images as $image) {
+            if(array_key_exists('media_folder_id', $image)) {
+                if($image['media_folder_id'] === $qiMediaFolderId) {
+                    if (array_key_exists('link_dams', $image)) {
+                        if(empty($image['link_dams']) && array_key_exists('original_filename', $image)) {
+                            if ($image['original_filename'] === $originalFilename) {
+                                $result = $image;
+                                break;
+                            }
+                        }
+                    }
                 }
             }
         }
         return $result;
     }
 
-    public function getMatchingLinkedImage($mediaInfos, $resourceId, $qiLinkDamsPrefix)
+    public function updateMetadata($object, $qiImage, $resource, $rsFields, $rsImportMapping, $rsFullDataFields,
+                                   $qiImportMapping, $qiLinkDamsPrefix, $addLinkDams, $resourceSpace)
     {
-        $result = null;
-        foreach($mediaInfos as $mediaInfo) {
-            if(array_key_exists('link_dams', $mediaInfo)) {
-                if(strpos($mediaInfo['link_dams'], $qiLinkDamsPrefix) === $qiLinkDamsPrefix . $resourceId) {
-                    $result = $mediaInfo;
-                    break;
-                }
-            }
-        }
-        return $result;
-    }
-
-    public function updateMetadata($qiImage, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix)
-    {
+        $resourceId = $resource['ref'];
         $record = [];
+
+        // Translate ResourceSpace credit field and check if this needs updating in this Qi image
+        if(array_key_exists($rsFields['credit'], $resource)) {
+            $translatedCredits = $this->translateCredit($resource[$rsFields['credit']]);
+            $translatedCredits[$this->creditConfig['qi_field_prefix']] = $resource[$rsFields['credit']];
+            foreach($translatedCredits as $qiField => $credit) {
+                $changed = false;
+                if(array_key_exists($qiField, $qiImage)) {
+                    if($qiImage[$qiField] !== $credit) {
+                        $changed = true;
+                    }
+                } else {
+                    $changed = true;
+                }
+                if($changed) {
+                    $record[$qiField] = $credit;
+                }
+            }
+        } else {
+            foreach($this->creditConfig['languages'] as $language) {
+                $record[$this->creditConfig['qi_field_prefix'] . $language] = '';
+            }
+        }
+
+        // Loop through all other ResourceSpace fields and check if they need updating in this Qi image
         foreach($qiImportMapping as $qiPropertyName => $rsPropertyName) {
             if(array_key_exists($rsFields[$rsPropertyName], $resource)) {
                 $changed = false;
@@ -199,16 +213,8 @@ class Qi
                 $record[$qiPropertyName] = '';
             }
         }
-        $addLinkDams = false;
-        if(array_key_exists('link_dams', $qiImage)) {
-            if($qiImage['link_dams'] !== $qiLinkDamsPrefix . $resource['ref']) {
-                $addLinkDams = true;
-            }
-        } else {
-            $addLinkDams = true;
-        }
         if($addLinkDams) {
-            $record['link_dams'] = $qiLinkDamsPrefix . $resource['ref'];
+            $record['link_dams'] = $qiLinkDamsPrefix . $resourceId;
         }
         if(!empty($record)) {
             $data = [
@@ -217,6 +223,112 @@ class Qi
             ];
             self::putMetadata($data);
         }
+
+        try {
+            $jsonObject = new JsonObject($object);
+            foreach ($rsImportMapping as $fieldName => $field) {
+                $res = $this->getFieldData($jsonObject, $fieldName, $field);
+                if ($res !== null) {
+                    if(array_key_exists($fieldName, $rsFullDataFields)) {
+                        $fullRSData = $resourceSpace->getResourceData($resourceId);
+                        if(array_key_exists($fieldName, $fullRSData)) {
+                            $resourceInfo[$rsFullDataFields[$fieldName]] = $fullRSData[$fieldName];
+                        }
+                    }
+                    $fieldId = $rsFields[$fieldName];
+                    if(array_key_exists('overwrite', $field) && array_key_exists($fieldId, $resourceInfo)) {
+                        if($field['overwrite'] === 'no') {
+                            if(!empty($resourceData[$fieldId])) {
+                                if($this->debug) {
+                                    echo 'Not overwriting field ' . $fieldName . ' for res ' . $res . ' (already has ' . $resourceData[$fieldId] . ')' . PHP_EOL;
+                                }
+                                $res = null;
+                            }
+                        } else if($field['overwrite'] === 'merge') {
+                            if(!empty($resourceData[$fieldId])) {
+                                if(strpos($resourceData[$fieldId], $res) === false) {
+                                    if($this->debug) {
+                                        echo 'Merging field ' . $fieldName . ' for res ' . $res . ' (already has ' . $resourceData[$fieldId] . ')' . PHP_EOL;
+                                    }
+                                    $res = $resourceData[$fieldId] . '\n\n' . $res;
+                                } else {
+                                    if($this->debug) {
+                                        echo 'Not merging field ' . $fieldName . ' for res ' . $res . ' (already has ' . $resourceData[$fieldId] . ')' . PHP_EOL;
+                                    }
+                                    $res = null;
+                                }
+                            }
+                        }
+                    }
+                    if($res !== null) {
+                        $nodeValue = false;
+                        if (array_key_exists('node_value', $field)) {
+                            if ($field['node_value'] === 'yes') {
+                                $nodeValue = true;
+                            }
+                        }
+                        if (!$this->test || $resourceId === '149565') {
+                            if($this->debug) {
+                                echo $fieldName . ' - ' . $res . PHP_EOL;
+                            }
+                            $resourceSpace->updateField($resourceId, $fieldName, $res, $nodeValue);
+                        }
+                    }
+                }
+            }
+        } catch (InvalidJsonException $e) {
+            echo 'JSONPath error: ' . $e->getMessage() . PHP_EOL;
+        }
+    }
+
+    private function translateCredit($credit)
+    {
+        $split = [
+            $credit
+        ];
+        foreach($this->creditConfig['split_chars'] as $splitChar) {
+            $newSplit = [];
+            foreach($split as $item) {
+                $splitItem = explode($splitChar, $item);
+                $count = count($splitItem);
+                for($i = 0; $i < $count; $i++) {
+                    $newSplit[] = $splitItem[$i];
+                    if($i < $count - 1) {
+                        $newSplit[] = $splitChar;
+                    }
+                }
+            }
+            $split = $newSplit;
+        }
+        $translatedCredit = [];
+        $qiFieldPrefix = $this->creditConfig['qi_field_prefix'];
+        foreach($this->creditConfig['languages'] as $language) {
+            $translatedCredit[$qiFieldPrefix . $language] = '';
+        }
+        foreach($split as $item) {
+            $trimmedItem = trim($item);
+            $match = null;
+            foreach($this->creditConfig['translations'] as $nlValue => $translations) {
+                if($nlValue === $trimmedItem) {
+                    $match = $translations;
+                    break;
+                }
+            }
+            if($match === null) {
+                foreach($this->creditConfig['languages'] as $language) {
+                    $translatedCredit[$qiFieldPrefix . $language] .= $item;
+                }
+            } else {
+                $before = strlen($item) - strlen(ltrim($item));
+                $left = substr($item, 0, $before);
+                $after = strlen($item) - strlen(rtrim($item));
+                $right = substr($item, 0, -$after);
+                foreach($match as $language => $translation) {
+                    $translatedCredit[$qiFieldPrefix . $language] .= $left . $translation . $right;
+                }
+            }
+        }
+        return $translatedCredit;
     }
 
     public function putMetadata($data) {
@@ -473,6 +585,16 @@ class Qi
             case '11':
                 return '30';
         }
+    }
+
+    public function hasLinkDams($image)
+    {
+        if (array_key_exists('link_dams', $image)) {
+            if (!empty($image['link_dams'])) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public function get($url)

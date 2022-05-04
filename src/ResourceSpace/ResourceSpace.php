@@ -61,9 +61,9 @@ class ResourceSpace
         return json_decode($data, true);
     }
 
-    public function getResourcePath($id, $type, $filePath, $extension = '')
+    public function getAllImages($id)
     {
-        $data = $this->doApiCall('get_resource_path&param1=' . $id . '&param2=' . $filePath . '&param3=' . $type . '&param5=' . $extension);
+        $data = $this->doApiCall('get_resource_all_image_sizes&param1=' . $id);
         return json_decode($data, true);
     }
 
