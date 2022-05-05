@@ -131,7 +131,7 @@ class TestCommand extends Command
                     foreach($this->qiImages[$object->id] as $image) {
                         if($this->qi->hasLinkDams($image)) {
                             if ($image['link_dams'] === $qiLinkDamsPrefix . $resourceId) {
-//                                $upload = false;
+                                $upload = false;
                                 $this->qi->updateMetadata($object, $image, $resource, $rsFields, $rsImportMapping,
                                                           $rsFullDataFields, $qiImportMapping, $qiLinkDamsPrefix,
                                                false, $this->resourceSpace);
