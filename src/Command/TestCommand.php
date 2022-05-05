@@ -64,6 +64,7 @@ class TestCommand extends Command
         if(!StringUtil::endsWith($ftpFolder, '/')) {
             $ftpFolder .= '/';
         }
+        $ftpUser = $this->params->get('ftp_user');
 
         // Abort the run if the ftp folder exists and is not empty
         if(is_dir($ftpFolder)) {
@@ -166,6 +167,7 @@ class TestCommand extends Command
                                     if($this->update) {
                                         if(!is_dir($ftpFolder)) {
                                             mkdir($ftpFolder, 0700, true);
+                                            chown($ftpFolder, $ftpUser);
                                         }
                                         copy($image['url'], $ftpFolder . $filename);
 
