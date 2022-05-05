@@ -174,7 +174,7 @@ class TestCommand extends Command
                                         copy($image['url'], $ftpFolder . $filename);
                                         chown($ftpFolder . $filename, $ftpUser);
                                         chgrp($ftpFolder . $filename, $ftpGroup);
-                                        chmod($ftpFolder . $filename, '0600');
+                                        chmod($ftpFolder . $filename, 0600);
 
                                         $resource = new Resource();
                                         $resource->setImportTimestamp(new DateTime());
