@@ -165,7 +165,7 @@ class TestCommand extends Command
                                     echo 'Uploading resource ' . $resourceId . ' to ' . $filename . '.' . PHP_EOL;
                                     if($this->update) {
                                         if(!is_dir($ftpFolder)) {
-                                            mkdir($ftpFolder, 0777, true);
+                                            mkdir($ftpFolder, 0700, true);
                                         }
                                         copy($image['url'], $ftpFolder . $filename);
 
