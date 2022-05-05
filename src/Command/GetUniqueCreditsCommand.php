@@ -50,10 +50,12 @@ class GetUniqueCreditsCommand extends Command
 
         $allCredits = [];
         foreach($allResources as $resource) {
-            if(!array_key_exists($resource[$rsFields['credit']], $allCredits)) {
-                $allCredits[$resource[$rsFields['credit']]] = 1;
+            $credit = $resource[$rsFields['credit']];
+            $credit = preg_replace( '/[^[:print:]]/', '', $credit);
+            if(!array_key_exists($credit, $allCredits)) {
+                $allCredits[$credit] = 1;
             } else {
-                $allCredits[$resource[$rsFields['credit']]]++;
+                $allCredits[$credit]++;
             }
         }
         echo PHP_EOL;

@@ -271,7 +271,7 @@ class Qi
                                     $nodeValue = true;
                                 }
                             }
-                            if (!$this->test || $resourceId === '149565') {
+                            if (!$this->test || $resourceId === 149565) {
                                 $resourceSpace->updateField($resourceId, $fieldName, $res, $nodeValue);
                             }
                         }
