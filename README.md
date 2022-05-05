@@ -1,6 +1,6 @@
 ## Preparation
 
-You need to provide a database to use with the connector, this is used to store MD5 file checksums to prevent duplicate offloads, export jobs with their status and download URL's with their expiry date.
+You need to provide a database to use with the connector.
 Just one table must be present in this database, called 'resource', according to the following schema:
 ```
 CREATE TABLE `resource` (
