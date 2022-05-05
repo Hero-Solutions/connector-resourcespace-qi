@@ -2,6 +2,8 @@
 
 namespace App\Qi;
 
+use App\Entity\Resource;
+use App\ResourceSpace\ResourceSpace;
 use JsonPath\InvalidJsonException;
 use JsonPath\JsonObject;
 
@@ -148,8 +150,7 @@ class Qi
         return $result;
     }
 
-    public function updateMetadata($object, $qiImage, $resource, $rsFields, $rsImportMapping, $rsFullDataFields,
-                                   $qiImportMapping, $qiLinkDamsPrefix, $addLinkDams, $resourceSpace)
+    public function updateMetadata($qiImage, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, $addLinkDams)
     {
         $resourceId = $resource['ref'];
         $record = [];
@@ -205,8 +206,22 @@ class Qi
             ];
             self::putMetadata($data);
         }
+    }
 
+    public function updateResourceSpaceData($object, $resource, $resourceId, $rsFields, $rsImportMapping, $rsFullDataFields, $qiUrl, ResourceSpace $resourceSpace)
+    {
         try {
+            $linkCms = $qiUrl . $object->id;
+            $updateLinkCms = false;
+            if(!array_key_exists($rsFields['linkcms'], $resource)) {
+                $updateLinkCms = true;
+            } else if($resource[$rsFields['linkcms']] !== $linkCms) {
+                $updateLinkCms = true;
+            }
+            if($updateLinkCms) {
+                $resourceSpace->updateField($resourceId, 'linkcms', $linkCms);
+            }
+
             $jsonObject = new JsonObject($object);
             foreach ($rsImportMapping as $fieldName => $field) {
                 $res = $this->getFieldData($jsonObject, $fieldName, $field);

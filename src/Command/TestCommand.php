@@ -89,6 +89,7 @@ class TestCommand extends Command
         $rsFullDataFields = $rsConfig['full_data_fields'];
 
         $qiConfig = $this->params->get('qi');
+        $qiUrl = $qiConfig['url'];
         $qiLinkDamsPrefix = $qiConfig['link_dams_prefix'];
         $qiMediaFolderId = $qiConfig['media_folder_id'];
         $qiImportMapping = $qiConfig['import_mapping'];
@@ -115,7 +116,7 @@ class TestCommand extends Command
         $this->objectIdsUploadedTo = [];
 
         // Add Link DAMS and metadata to images in Qi that were imported in a previous run
-        $this->linkImportedResources($rsFields, $rsImportMapping, $rsFullDataFields, $qiImportMapping, $qiMediaFolderId, $qiLinkDamsPrefix);
+        $this->linkImportedResources($rsFields, $qiImportMapping, $qiMediaFolderId, $qiLinkDamsPrefix);
 
         // Update Qi image metadata with metadata from Qi objects
         $this->updateQiSelfMetadata($qiMappingToSelf);
@@ -128,15 +129,13 @@ class TestCommand extends Command
                 if (array_key_exists($inventoryNumber, $this->objectsByInventoryNumber)) {
                     $object = $this->objectsByInventoryNumber[$inventoryNumber];
                     $rsFilename = $resource[$rsFields['originalfilename']];
-                    $upload = true;
+                    $hasMatchingImage = false;
 
                     foreach($this->qiImages[$object->id] as $image) {
                         if($this->qi->hasLinkDams($image)) {
                             if ($image['link_dams'] === $qiLinkDamsPrefix . $resourceId) {
-                                $upload = false;
-                                $this->qi->updateMetadata($object, $image, $resource, $rsFields, $rsImportMapping,
-                                                          $rsFullDataFields, $qiImportMapping, $qiLinkDamsPrefix,
-                                               false, $this->resourceSpace);
+                                $hasMatchingImage = true;
+                                $this->qi->updateMetadata($image, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, false);
                             }
                         } else if(array_key_exists('filename', $image)) {
                             $fromRS = true;
@@ -147,15 +146,15 @@ class TestCommand extends Command
                             }
                             if(!$fromRS) {
                                 if ($this->filenamesMatch($resourceId, $rsFilename, $image['filename'])) {
-                                    $upload = false;
-                                    $this->qi->updateMetadata($object, $image, $resource, $rsFields, $rsImportMapping,
-                                                              $rsFullDataFields, $qiImportMapping, $qiLinkDamsPrefix,
-                                                   true, $this->resourceSpace);
+                                    $hasMatchingImage = true;
+                                    $this->qi->updateMetadata($image, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true);
                                 }
                             }
                         }
                     }
-                    if($upload && !array_key_exists($object->id, $this->objectIdsUploadedTo)) {
+                    if($hasMatchingImage) {
+                        $this->qi->updateResourceSpaceData($object, $resource, $resourceId, $rsFields, $rsImportMapping, $rsFullDataFields, $qiUrl, $this->resourceSpace);
+                    } else if(!array_key_exists($object->id, $this->objectIdsUploadedTo)) {
                         $allImages = $this->resourceSpace->getAllImages($resourceId);
                         foreach($fileSizes as $fileSize) {
                             $found = false;
@@ -164,7 +163,7 @@ class TestCommand extends Command
                                     $found = true;
                                     $filename = $object->id . '-1.' . $image['extension'];
                                     $this->objectIdsUploadedTo[$object->id] = $object->id;
-                                    echo 'Uploading resource ' . $resourceId . ' to ' . $filename . '.' . PHP_EOL;
+                                    echo 'Uploading resource ' . $resourceId . ' to ' . $filename . ' (inventory number ' . $inventoryNumber . ').' . PHP_EOL;
                                     if($this->update) {
                                         if(!is_dir($ftpFolder)) {
                                             mkdir($ftpFolder, 0700, true);
@@ -196,7 +195,6 @@ class TestCommand extends Command
                             }
                         }
                     }
-
                 }
             }
         }
@@ -330,7 +328,7 @@ class TestCommand extends Command
         }
     }
 
-    private function linkImportedResources($rsFields, $rsImportMapping, $rsFullDataFields, $qiImportMapping, $qiMediaFolderId, $qiLinkDamsPrefix)
+    private function linkImportedResources($rsFields, $qiImportMapping, $qiMediaFolderId, $qiLinkDamsPrefix)
     {
         /* @var $importedResources Resource[] */
         $importedResources = $this->entityManager->createQueryBuilder()
@@ -349,8 +347,7 @@ class TestCommand extends Command
                     $resource = $this->resourcesByResourceId[$ir->getResourceId()];
                     $qiImage = $this->qi->getMatchingImageToBeLinked($images, $ir->getOriginalFilename(), $qiMediaFolderId);
                     if ($qiImage !== null) {
-                        $this->qi->updateMetadata($object, $qiImage, $resource, $rsFields, $rsImportMapping,
-                            $rsFullDataFields, $qiImportMapping, $qiLinkDamsPrefix, true, $this->resourceSpace);
+                        $this->qi->updateMetadata($qiImage, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true);
                         $this->entityManager->remove($ir);
                         $i++;
                         if ($i % 100 === 0) {
