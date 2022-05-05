@@ -65,6 +65,7 @@ class TestCommand extends Command
             $ftpFolder .= '/';
         }
         $ftpUser = $this->params->get('ftp_user');
+        $ftpGroup = $this->params->get('ftp_group');
 
         // Abort the run if the ftp folder exists and is not empty
         if(is_dir($ftpFolder)) {
@@ -168,8 +169,12 @@ class TestCommand extends Command
                                         if(!is_dir($ftpFolder)) {
                                             mkdir($ftpFolder, 0700, true);
                                             chown($ftpFolder, $ftpUser);
+                                            chgrp($ftpFolder, $ftpGroup);
                                         }
                                         copy($image['url'], $ftpFolder . $filename);
+                                        chown($ftpFolder . $filename, $ftpUser);
+                                        chgrp($ftpFolder . $filename, $ftpGroup);
+                                        chmod($ftpFolder . $filename, '0600');
 
                                         $resource = new Resource();
                                         $resource->setImportTimestamp(new DateTime());
