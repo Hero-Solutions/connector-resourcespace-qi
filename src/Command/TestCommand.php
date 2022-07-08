@@ -33,6 +33,7 @@ class TestCommand extends Command
     private $objectsByInventoryNumber;
     private $qiImages;
     private $objectIdsUploadedTo;
+    private $linkedResources;
 
     protected function configure()
     {
@@ -114,6 +115,7 @@ class TestCommand extends Command
         }
 
         $this->objectIdsUploadedTo = [];
+        $this->linkedResources = [];
 
         // Add Link DAMS and metadata to images in Qi that were imported in a previous run
         $this->linkImportedResources($rsFields, $qiImportMapping, $qiMediaFolderId, $qiLinkDamsPrefix);
@@ -124,76 +126,82 @@ class TestCommand extends Command
         $uploaded = 0;
 
         foreach ($this->resourcesByResourceId as $resourceId => $resource) {
+            // Skip resources that we just linked to an object in Qi
+            if(array_key_exists($resourceId, $this->linkedResources)) {
+                continue;
+            }
             $inventoryNumber = $resource[$rsFields['inventorynumber']];
-            if(!empty($inventoryNumber)) {
-                if (array_key_exists($inventoryNumber, $this->objectsByInventoryNumber)) {
-                    $object = $this->objectsByInventoryNumber[$inventoryNumber];
-                    $rsFilename = $resource[$rsFields['originalfilename']];
-                    $hasMatchingImage = false;
+            if(empty($inventoryNumber)) {
+                continue;
+            }
+            if (!array_key_exists($inventoryNumber, $this->objectsByInventoryNumber)) {
+                continue;
+            }
+            $object = $this->objectsByInventoryNumber[$inventoryNumber];
+            $rsFilename = $resource[$rsFields['originalfilename']];
+            $hasMatchingImage = false;
 
-                    foreach($this->qiImages[$object->id] as $image) {
-                        if($this->qi->hasLinkDams($image)) {
-                            if ($image['link_dams'] === $qiLinkDamsPrefix . $resourceId) {
-                                $hasMatchingImage = true;
-                                $this->qi->updateMetadata($image, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, false);
-                            }
-                        } else if(array_key_exists('filename', $image)) {
-                            $fromRS = true;
-                            if(!array_key_exists('media_folder_id', $image)) {
-                                $fromRS = false;
-                            } else if($image['media_folder_id'] !== $qiMediaFolderId) {
-                                $fromRS = false;
-                            }
-                            if(!$fromRS) {
-                                if ($this->filenamesMatch($resourceId, $rsFilename, $image['filename'])) {
-                                    $hasMatchingImage = true;
-                                    $this->qi->updateMetadata($image, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true);
-                                }
-                            }
+            foreach($this->qiImages[$object->id] as $image) {
+                if($this->qi->hasLinkDams($image)) {
+                    if ($image['link_dams'] === $qiLinkDamsPrefix . $resourceId) {
+                        $hasMatchingImage = true;
+                        $this->qi->updateMetadata($image, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, false);
+                    }
+                } else if(array_key_exists('filename', $image)) {
+                    $fromRS = true;
+                    if(!array_key_exists('media_folder_id', $image)) {
+                        $fromRS = false;
+                    } else if($image['media_folder_id'] !== $qiMediaFolderId) {
+                        $fromRS = false;
+                    }
+                    if(!$fromRS) {
+                        if ($this->filenamesMatch($resourceId, $rsFilename, $image['filename'])) {
+                            $hasMatchingImage = true;
+                            $this->qi->updateMetadata($image, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true);
                         }
                     }
-                    if($hasMatchingImage) {
-                        $this->qi->updateResourceSpaceData($object, $resource, $resourceId, $rsFields, $rsImportMapping, $rsFullDataFields, $qiUrl, $this->resourceSpace);
-                    } else if(!array_key_exists($object->id, $this->objectIdsUploadedTo)) {
-                        $allImages = $this->resourceSpace->getAllImages($resourceId);
-                        foreach($fileSizes as $fileSize) {
-                            $found = false;
-                            foreach($allImages as $image) {
-                                if($image['size_code'] === $fileSize) {
-                                    $found = true;
-                                    $filename = $object->id . '-1.' . $image['extension'];
-                                    $this->objectIdsUploadedTo[$object->id] = $object->id;
-                                    echo 'Uploading resource ' . $resourceId . ' to ' . $filename . ' (inventory number ' . $inventoryNumber . ').' . PHP_EOL;
-                                    if($this->update) {
-                                        if(!is_dir($ftpFolder)) {
-                                            mkdir($ftpFolder, 0700, true);
-                                            chown($ftpFolder, $ftpUser);
-                                            chgrp($ftpFolder, $ftpGroup);
-                                        }
-                                        copy($image['url'], $ftpFolder . $filename);
-                                        chown($ftpFolder . $filename, $ftpUser);
-                                        chgrp($ftpFolder . $filename, $ftpGroup);
-                                        chmod($ftpFolder . $filename, 0600);
+                }
+            }
+            if($hasMatchingImage) {
+                $this->qi->updateResourceSpaceData($object, $resource, $resourceId, $rsFields, $rsImportMapping, $rsFullDataFields, $qiUrl, $this->resourceSpace);
+            } else if(!array_key_exists($object->id, $this->objectIdsUploadedTo)) {
+                $allImages = $this->resourceSpace->getAllImages($resourceId);
+                foreach($fileSizes as $fileSize) {
+                    $found = false;
+                    foreach($allImages as $image) {
+                        if($image['size_code'] === $fileSize) {
+                            $found = true;
+                            $filename = $object->id . '-1.' . $image['extension'];
+                            $this->objectIdsUploadedTo[$object->id] = $object->id;
+                            echo 'Uploading resource ' . $resourceId . ' to ' . $filename . ' (inventory number ' . $inventoryNumber . ').' . PHP_EOL;
+                            if($this->update) {
+                                if(!is_dir($ftpFolder)) {
+                                    mkdir($ftpFolder, 0700, true);
+                                    chown($ftpFolder, $ftpUser);
+                                    chgrp($ftpFolder, $ftpGroup);
+                                }
+                                copy($image['url'], $ftpFolder . $filename);
+                                chown($ftpFolder . $filename, $ftpUser);
+                                chgrp($ftpFolder . $filename, $ftpGroup);
+                                chmod($ftpFolder . $filename, 0600);
 
-                                        $resource = new Resource();
-                                        $resource->setImportTimestamp(new DateTime());
-                                        $resource->setResourceId($resourceId);
-                                        $resource->setObjectId($object->id);
-                                        $resource->setInventoryNumber($inventoryNumber);
-                                        $resource->setOriginalFilename($filename);
-                                        $this->entityManager->persist($resource);
-                                        $uploaded++;
-                                        if ($uploaded % 100 === 0) {
-                                            $this->entityManager->flush();
-                                        }
-                                    }
-                                    break;
+                                $resource = new Resource();
+                                $resource->setImportTimestamp(new DateTime());
+                                $resource->setResourceId($resourceId);
+                                $resource->setObjectId($object->id);
+                                $resource->setInventoryNumber($inventoryNumber);
+                                $resource->setOriginalFilename($filename);
+                                $this->entityManager->persist($resource);
+                                $uploaded++;
+                                if ($uploaded % 100 === 0) {
+                                    $this->entityManager->flush();
                                 }
                             }
-                            if($found) {
-                                break;
-                            }
+                            break;
                         }
+                    }
+                    if($found) {
+                        break;
                     }
                 }
             }
@@ -349,6 +357,7 @@ class TestCommand extends Command
                     if ($qiImage !== null) {
                         $this->qi->updateMetadata($qiImage, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true);
                         $this->entityManager->remove($ir);
+                        $this->linkedResources[$ir->getResourceId()] = $ir->getResourceId();
                         $i++;
                         if ($i % 100 === 0) {
                             $this->entityManager->flush();
