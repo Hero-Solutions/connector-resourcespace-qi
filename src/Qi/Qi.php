@@ -75,8 +75,6 @@ class Qi
                 } else {
                     echo 'Error: Qi record ' . $record->id . ' has no inventory number' . PHP_EOL;
                 }
-            } else {
-                echo 'Warning: Qi record ' . $record->id . ' is not online.' . PHP_EOL;
             }
         }
         for($i = 1; !$this->test && $i < ($count + 499) / 500 - 1; $i++) {
@@ -91,8 +89,6 @@ class Qi
                     } else {
                         echo 'Error: Qi record ' . $record->id . ' has no inventory number' . PHP_EOL;
                     }
-                } else {
-                    echo 'Warning: Qi record ' . $record->id . ' is not online.' . PHP_EOL;
                 }
             }
         }
