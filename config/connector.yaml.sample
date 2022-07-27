@@ -1,6 +1,59 @@
 ---
 parameters:
   test: true
+  debug: true
+  update: true
+  ftp_folder: 'images/'
+  ftp_user: ''
+  ftp_group: ''
+  only_online_records: true
+
+  allowed_extensions:
+    - gif
+    - jpg
+    - jpeg
+    - png
+    - tiff
+    - tif
+
+  file_sizes:
+    - lpr
+    - scr
+    - hpr
+    - pre
+    - original
+
+  forbidden_inventory_number_prefixes:
+    # Tijdelijke Bruikleen
+    - 'TB'
+
+  forbidden_filename_postfixes:
+    # WerkFoto
+    - '_WF'
+
+  credit:
+    qi_field_prefix: 'credits'
+    split_chars:
+      - '©'
+      - ':'
+      - ','
+      - '.'
+      - '('
+      - ')'
+      - '/'
+    languages:
+      - en
+      - fr
+      - de
+    translations:
+      foto:
+        en: photo
+        fr: photo
+        de: Foto
+      Foto:
+        en: Photo
+        fr: Photo
+        de: Foto
 
   resourcespace:
     api:
@@ -9,6 +62,8 @@ parameters:
       key: ''
     search_query: 'publisher:TEST'
     fields:
+      linkwithcms: field152
+      linkcms: field150
       originalfilename: field51
       inventorynumber: field105
       title: field8
@@ -22,7 +77,8 @@ parameters:
       copyrightowner: field99
       credit: field10
       externalnote: field120
-    full_resource_data:
+    linkwithcmsvalue: 'Yes'
+    full_data_fields:
       internalnote: field25
     # 'path', 'parent_path', 'key_path' and 'value_path' are JSON path expressions (see https://github.com/Galbar/JsonPath-PHP) used to parse the JSON data from Qi
     # There is no mapping by default, override by setting the 'mapping' property. Possible values for all properties:
@@ -48,10 +104,10 @@ parameters:
     #    yes - remove commas in the results (before joining them together). Applies only to 'list' type
     import_mapping:
       title:
-        path: "$.relationship.object_title[?(@.details.language_id_name == 'Nederlands' and @.details.object_title_type_id_name == 'Hoofdtitel')].name"
+        path: "$.relationship.object_title[?(@.details.language_id_name == 'Nederlands' and @.details.object_title_type_id_name == 'Hoofdtitel' or @.details.language_id_name == 'Dutch' and @.details.object_title_type_id_name == 'Hoofdtitel')].name"
       description:
         type: list
-        parent_path: "$.relationship.object_description[?(@.details.language_id_name == 'Nederlands')]"
+        parent_path: "$.relationship.object_description[?(@.details.language_id_name == 'Nederlands' or @.details.language_id_name == 'Dutch')]"
         key_path: '$.details.object_description_type_id_name'
         value_path: '$.name'
         key_filter:
@@ -106,22 +162,22 @@ parameters:
         path: "$.rights_statement"
 
   qi:
+    url: ''
     api:
       url: ''
       username: ''
       password: ''
-    get_fields: 'object_number,ipr_status_value,rights_statement,internalnote,relationship,media.image.id,media.image.media_folder_id,media.image.name,media.image.caption,media.image.credits,media.image.copyright,media.image.link_dams'
-    media_folder:
-      field: media_folder_id
-      id: 563
-    link_dams:
-      field: link_dams
-      prefix: ''
+    get_fields: 'object_number,ipr_status_value,rights_statement,internalnote,relationship,media.image.id,media.image.media_folder_id,media.image.original_filename,media.image.name,media.image.caption,media.image.credits,media.image.credits_en,media.image.credits_fr,media.image.credits_de,media.image.copyright,media.image.link_dams,media.image.filename,media.image.name,media.image.name_en,media.image.name_fr,media.image.name_de'
     import_mapping:
-      name: title
       caption: externalnote
-      credits: credit
       copyright: copyrightowner
+    mapping_to_self:
+      name: "$.relationship.object_title[?(@.details.language_id_name == 'Nederlands' and @.details.object_title_type_id_name == 'Hoofdtitel' or @.details.language_id_name == 'Dutch' and @.details.object_title_type_id_name == 'Hoofdtitel')].name"
+      name_en: "$.relationship.object_title[?(@.details.language_id_name == 'Engels' and @.details.object_title_type_id_name == 'Hoofdtitel' or @.details.language_id_name == 'English' and @.details.object_title_type_id_name == 'Hoofdtitel')].name"
+      name_fr: "$.relationship.object_title[?(@.details.language_id_name == 'Frans' and @.details.object_title_type_id_name == 'Hoofdtitel' or @.details.language_id_name == 'French' and @.details.object_title_type_id_name == 'Hoofdtitel')].name"
+      name_de: "$.relationship.object_title[?(@.details.language_id_name == 'Duits' and @.details.object_title_type_id_name == 'Hoofdtitel' or @.details.language_id_name == 'German' and @.details.object_title_type_id_name == 'Hoofdtitel')].name"
+    link_dams_prefix: 'https://museumstichting.resourcespace.com/?r='
+    media_folder_id: '563'
 
   # Certificate Authority (also known as 'cacert') may not work on its own depending on your system and PHP configuration,
   # that's why a cacert.pem is included in this project (from https://curl.haxx.se/docs/caextract.html).

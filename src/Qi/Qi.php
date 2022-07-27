@@ -19,12 +19,13 @@ class Qi
     private $test;
     private $debug;
     private $update;
+    private $onlyOnlineRecords;
     private $unknownMappings = [];
 
     private $objectsByObjectId;
     private $objectsByInventoryNumber;
 
-    public function __construct($qi, $sslCertificateAuthority, $creditConfig, $test, $debug, $update)
+    public function __construct($qi, $sslCertificateAuthority, $creditConfig, $test, $debug, $update, $onlyOnlineRecords)
     {
         $qiApi = $qi['api'];
         $this->baseUrl = $qiApi['url'];
@@ -39,6 +40,7 @@ class Qi
         $this->test = $test;
         $this->debug = $debug;
         $this->update = $update;
+        $this->onlyOnlineRecords = $onlyOnlineRecords;
     }
 
     public function getObjectsByObjectId()
@@ -66,11 +68,15 @@ class Qi
         $count = $objs->count;
         $records = $objs->records;
         foreach($records as $record) {
-            $this->objectsByObjectId[intval($record->id)] = $record;
-            if(!empty($record->object_number)) {
-                $this->objectsByInventoryNumber[$record->object_number] = $record;
+            if(!$this->onlyOnlineRecords || $record->online === '1') {
+                $this->objectsByObjectId[intval($record->id)] = $record;
+                if(!empty($record->object_number)) {
+                    $this->objectsByInventoryNumber[$record->object_number] = $record;
+                } else {
+                    echo 'Error: Qi record ' . $record->id . ' has no inventory number' . PHP_EOL;
+                }
             } else {
-                echo 'Error: Qi record ' . $record->id . ' has no inventory number' . PHP_EOL;
+                echo 'Warning: Qi record ' . $record->id . ' is not online.' . PHP_EOL;
             }
         }
         for($i = 1; !$this->test && $i < ($count + 499) / 500 - 1; $i++) {
@@ -78,11 +84,15 @@ class Qi
             $objs = json_decode($objsJson);
             $records = $objs->records;
             foreach($records as $record) {
-                $this->objectsByObjectId[intval($record->id)] = $record;
-                if(!empty($record->object_number)) {
-                    $this->objectsByInventoryNumber[$record->object_number] = $record;
+                if(!$this->onlyOnlineRecords || $record->online === '1') {
+                    $this->objectsByObjectId[intval($record->id)] = $record;
+                    if(!empty($record->object_number)) {
+                        $this->objectsByInventoryNumber[$record->object_number] = $record;
+                    } else {
+                        echo 'Error: Qi record ' . $record->id . ' has no inventory number' . PHP_EOL;
+                    }
                 } else {
-                    echo 'Error: Qi record ' . $record->id . ' has no inventory number' . PHP_EOL;
+                    echo 'Warning: Qi record ' . $record->id . ' is not online.' . PHP_EOL;
                 }
             }
         }

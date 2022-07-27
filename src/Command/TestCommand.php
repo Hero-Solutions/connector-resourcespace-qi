@@ -67,6 +67,7 @@ class TestCommand extends Command
         }
         $ftpUser = $this->params->get('ftp_user');
         $ftpGroup = $this->params->get('ftp_group');
+        $onlyOnlineRecords = $this->params->get('only_online_records');
 
         // Abort the run if the ftp folder exists and is not empty
         if(is_dir($ftpFolder)) {
@@ -103,7 +104,7 @@ class TestCommand extends Command
         $this->storeResources($allResources, $rsFields, $rsLinkWithCmsValue, $allowedExtensions, $forbiddenInventoryNumberPrefixes, $forbiddenFilenamePostfixes);
         echo count($this->resourcesByResourceId) . ' resources total for ' . count($this->resourcesByInventoryNumber) . ' unique inventory numbers.' . PHP_EOL;
 
-        $this->qi = new Qi($qiConfig, $sslCertificateAuthority, $creditConfig, $test, $debug, $this->update);
+        $this->qi = new Qi($qiConfig, $sslCertificateAuthority, $creditConfig, $test, $debug, $this->update, $onlyOnlineRecords);
         $this->qi->retrieveAllObjects();
         $this->objectsByObjectId = $this->qi->getObjectsByObjectId();
         $this->objectsByInventoryNumber = $this->qi->getObjectsByInventoryNumber();
