@@ -149,8 +149,8 @@ class Qi
                         if(empty($image['link_dams']) && array_key_exists('original_filename', $image)
                             && array_key_exists('width', $image) && array_key_exists('height', $image)
                             && array_key_exists('filesize', $image)) {
-                            if ($image['original_filename'] === $originalFilename && $image['width'] === $width
-                                && $image['height'] === $height && $image['filesize'] === $filesize) {
+                            if ($image['original_filename'] === $originalFilename && intval($image['width']) === $width
+                                && intval($image['height']) === $height && intval($image['filesize']) === $filesize) {
                                 $result = $image;
                                 break;
                             }
