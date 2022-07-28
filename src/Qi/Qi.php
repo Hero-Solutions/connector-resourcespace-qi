@@ -94,57 +94,18 @@ class Qi
         }
     }
 
-    public function getMediaInfos($object, $qiImportMapping, $qiMappingToSelf)
-    {
-        $mediaInfos = [];
-        if(property_exists($object, 'media.image.id')) {
-            $allMediaInfo = [];
-            $i = 0;
-            foreach ($object->{'media.image.id'} as $id) {
-                $allMediaInfo[$i] = [
-                    'id' => $id
-                ];
-                $i++;
-            }
-
-            $count = count($allMediaInfo);
-            $fieldsToGet = [
-                'link_dams' => '',
-                'media_folder_id' => '',
-                'filename' => '',
-                'original_filename' => ''
-            ];
-            $qiCreditFieldPrefix = $this->creditConfig['qi_field_prefix'];
-            $fieldsToGet[$qiCreditFieldPrefix] = '';
-            foreach($this->creditConfig['languages'] as $language) {
-                $fieldsToGet[$qiCreditFieldPrefix . '_' . $language] = '';
-            }
-            $fieldsToGet = array_merge($fieldsToGet, $qiImportMapping, $qiMappingToSelf);
-            foreach ($fieldsToGet as $fieldName => $dummy) {
-                if (property_exists($object, 'media.image.' . $fieldName) && count($object->{'media.image.' . $fieldName}) === $count) {
-                    $i = 0;
-                    foreach ($object->{'media.image.' . $fieldName} as $value) {
-                        $allMediaInfo[$i][$fieldName] = $value;
-                        $i++;
-                    }
-                }
-            }
-            for ($i = 0; $i < $count; $i++) {
-                $mediaInfos[] = $allMediaInfo[$i];
-            }
-        }
-        return $mediaInfos;
-    }
-
-    public function getMatchingImageToBeLinked($images, $originalFilename, $qiMediaFolderId)
+    public function getMatchingImageToBeLinked($images, $originalFilename, $width, $height, $filesize, $qiMediaFolderId)
     {
         $result = null;
         foreach($images as $image) {
             if(array_key_exists('media_folder_id', $image)) {
                 if($image['media_folder_id'] === $qiMediaFolderId) {
                     if (array_key_exists('link_dams', $image)) {
-                        if(empty($image['link_dams']) && array_key_exists('original_filename', $image)) {
-                            if ($image['original_filename'] === $originalFilename) {
+                        if(empty($image['link_dams']) && array_key_exists('original_filename', $image)
+                        && array_key_exists('width', $image) && array_key_exists('height', $image)
+                        && array_key_exists('filesize', $image)) {
+                            if ($image['original_filename'] === $originalFilename && $image['width'] === $width
+                            && $image['height'] === $height && $image['filesize'] === $filesize) {
                                 $result = $image;
                                 break;
                             }

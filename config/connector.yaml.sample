@@ -167,7 +167,7 @@ parameters:
       url: ''
       username: ''
       password: ''
-    get_fields: 'object_number,ipr_status_value,rights_statement,internalnote,relationship,media.image.id,media.image.media_folder_id,media.image.original_filename,media.image.name,media.image.caption,media.image.credits,media.image.credits_en,media.image.credits_fr,media.image.credits_de,media.image.copyright,media.image.link_dams,media.image.filename,media.image.name,media.image.name_en,media.image.name_fr,media.image.name_de'
+    get_fields: 'object_number,ipr_status_value,rights_statement,internalnote,relationship'
     import_mapping:
       caption: externalnote
       copyright: copyrightowner

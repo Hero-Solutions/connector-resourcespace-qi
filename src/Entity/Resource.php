@@ -37,6 +37,21 @@ class Resource
      */
     private $originalFilename;
 
+    /**
+     * @ORM\Column(type="integer")
+     */
+    private $width;
+
+    /**
+     * @ORM\Column(type="integer")
+     */
+    private $height;
+
+    /**
+     * @ORM\Column(type="integer")
+     */
+    private $filesize;
+
     public function getImportTimestamp()
     {
         return $this->importTimestamp;
@@ -85,5 +100,35 @@ class Resource
     public function setOriginalFilename($originalFilename)
     {
         $this->originalFilename = $originalFilename;
+    }
+
+    public function getWidth()
+    {
+        return $this->width;
+    }
+
+    public function setWidth($width)
+    {
+        $this->width = $width;
+    }
+
+    public function getHeight()
+    {
+        return $this->height;
+    }
+
+    public function setHeight($height)
+    {
+        $this->height = $height;
+    }
+
+    public function getFilesize()
+    {
+        return $this->filesize;
+    }
+
+    public function setFilesize($filesize)
+    {
+        $this->filesize = $filesize;
     }
 }

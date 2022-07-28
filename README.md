@@ -9,6 +9,9 @@ CREATE TABLE `resource` (
     `object_id` INT UNSIGNED NOT NULL,
     `inventory_number` VARCHAR(255) NOT NULL,
     `original_filename` VARCHAR(255) NOT NULL,
+    `width` INT UNSIGNED NOT NULL,
+    `height` INT UNSIGNED NOT NULL,
+    `filesize` INT UNSIGNED NOT NULL,
     PRIMARY KEY(resource_id)
 );
 ```
