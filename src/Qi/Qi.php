@@ -112,7 +112,10 @@ class Qi
                 'link_dams' => '',
                 'media_folder_id' => '',
                 'filename' => '',
-                'original_filename' => ''
+                'original_filename' => '',
+                'width' => '',
+                'height' => '',
+                'filesize' => ''
             ];
             $qiCreditFieldPrefix = $this->creditConfig['qi_field_prefix'];
             $fieldsToGet[$qiCreditFieldPrefix] = '';
