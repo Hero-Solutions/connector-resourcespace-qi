@@ -140,7 +140,7 @@ class TestCommand extends Command
         $uploaded = 0;
 
         foreach ($this->resourcesByResourceId as $resourceId => $resource) {
-            // Skip resources that we just linked to an object in Qi
+            // Skip resources that are already linked to an object in Qi
             if(array_key_exists($resourceId, $this->linkedResources)) {
                 continue;
             }
@@ -151,6 +151,10 @@ class TestCommand extends Command
             if (!array_key_exists($inventoryNumber, $this->objectsByInventoryNumber)) {
                 continue;
             }
+            if(array_key_exists($resourceId, $this->importedResources) && $this->importedResources[$resourceId]->getInventoryNumber() === $inventoryNumber) {
+                continue;
+            }
+
             $object = $this->objectsByInventoryNumber[$inventoryNumber];
             $rsFilename = $resource[$rsFields['originalfilename']];
             $hasMatchingImage = false;
@@ -200,6 +204,7 @@ class TestCommand extends Command
                             }
                             $resource->setLinked(2);
                             $this->entityManager->persist($resource);
+                            $this->importedResources[$resourceId] = $resource;
                             $uploaded++;
                             if ($uploaded % 100 === 0) {
                                 $this->entityManager->flush();
@@ -243,6 +248,7 @@ class TestCommand extends Command
                                 $resource->setHeight($size[1]);
                                 $resource->setFilesize(filesize($path));
                                 $this->entityManager->persist($resource);
+                                $this->importedResources[$resourceId] = $resource;
                                 $uploaded++;
                                 if ($uploaded % 100 === 0) {
                                     $this->entityManager->flush();
