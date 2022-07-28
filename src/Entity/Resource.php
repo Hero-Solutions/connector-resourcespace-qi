@@ -52,6 +52,11 @@ class Resource
      */
     private $filesize;
 
+    /**
+     * @ORM\Column(type="integer")
+     */
+    private $linked;
+
     public function getImportTimestamp()
     {
         return $this->importTimestamp;
@@ -130,5 +135,15 @@ class Resource
     public function setFilesize($filesize)
     {
         $this->filesize = $filesize;
+    }
+
+    public function getLinked()
+    {
+        return $this->linked;
+    }
+
+    public function setLinked($linked)
+    {
+        $this->linked = $linked;
     }
 }
