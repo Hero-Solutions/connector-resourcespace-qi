@@ -151,13 +151,14 @@ class TestCommand extends Command
             if (!array_key_exists($inventoryNumber, $this->objectsByInventoryNumber)) {
                 continue;
             }
-            if(array_key_exists($resourceId, $this->importedResources) && $this->importedResources[$resourceId]->getInventoryNumber() === $inventoryNumber) {
-                continue;
-            }
 
             $object = $this->objectsByInventoryNumber[$inventoryNumber];
             $rsFilename = $resource[$rsFields['originalfilename']];
             $hasMatchingImage = false;
+
+            if(array_key_exists($resourceId, $this->importedResources) && $this->importedResources[$resourceId]->getObjectId() === $object->id) {
+                continue;
+            }
 
             foreach($this->qiImages[$object->id] as $image) {
                 if($this->qi->hasLinkDams($image)) {
