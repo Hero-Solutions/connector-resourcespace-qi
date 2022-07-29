@@ -248,6 +248,7 @@ class TestCommand extends Command
                                 $resource->setWidth($size[0]);
                                 $resource->setHeight($size[1]);
                                 $resource->setFilesize(filesize($path));
+                                $resource->setLinked(0);
                                 $this->entityManager->persist($resource);
                                 $this->importedResources[$resourceId] = $resource;
                                 $uploaded++;
