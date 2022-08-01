@@ -195,7 +195,8 @@ class Qi
             if(array_key_exists($rsFields[$rsPropertyName], $resource)) {
                 $changed = false;
                 if(array_key_exists($qiPropertyName, $qiImage)) {
-                    if($qiImage[$qiPropertyName] !== $resource[$rsFields[$rsPropertyName]]) {
+                    if($qiImage[$qiPropertyName] !== $resource[$rsFields[$rsPropertyName]]
+                    && !(empty($qiImage[$qiPropertyName]) && empty($resource[$rsFields[$rsPropertyName]]))) {
                         $changed = true;
                     }
                 } else {
