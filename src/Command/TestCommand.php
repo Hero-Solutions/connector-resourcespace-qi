@@ -156,7 +156,7 @@ class TestCommand extends Command
             $rsFilename = $resource[$rsFields['originalfilename']];
             $hasMatchingImage = false;
 
-            if(array_key_exists($resourceId, $this->importedResources) && $this->importedResources[$resourceId]->getObjectId() === $object->id) {
+            if(array_key_exists($resourceId, $this->importedResources) && $this->importedResources[$resourceId]->getObjectId() === intval($object->id)) {
                 continue;
             }
 
