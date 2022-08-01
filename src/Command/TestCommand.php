@@ -156,8 +156,11 @@ class TestCommand extends Command
             $rsFilename = $resource[$rsFields['originalfilename']];
             $hasMatchingImage = false;
 
-            if(array_key_exists($resourceId, $this->importedResources) && $this->importedResources[$resourceId]->getObjectId() === intval($object->id)) {
-                continue;
+            $resourceIsLinked = false;
+            if(array_key_exists($resourceId, $this->importedResources)){
+                if($this->importedResources[$resourceId]->getObjectId() === intval($object->id)) {
+                    $resourceIsLinked = true;
+                }
             }
 
             foreach($this->qiImages[$object->id] as $image) {
@@ -166,7 +169,7 @@ class TestCommand extends Command
                         $hasMatchingImage = true;
                         $this->qi->updateMetadata($image, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, false);
                     }
-                } else if(array_key_exists('filename', $image)) {
+                } else if(!$resourceIsLinked && array_key_exists('filename', $image)) {
                     $fromRS = true;
                     if(!array_key_exists('media_folder_id', $image)) {
                         $fromRS = false;
@@ -216,7 +219,7 @@ class TestCommand extends Command
             }
             if($hasMatchingImage) {
                 $this->qi->updateResourceSpaceData($object, $resource, $resourceId, $rsFields, $rsImportMapping, $rsFullDataFields, $qiUrl, $this->resourceSpace);
-            } else if(!array_key_exists($object->id, $this->objectIdsUploadedTo)) {
+            } else if(!$resourceIsLinked && !array_key_exists($object->id, $this->objectIdsUploadedTo)) {
                 $allImages = $this->resourceSpace->getAllImages($resourceId);
                 foreach($fileSizes as $fileSize) {
                     $found = false;
