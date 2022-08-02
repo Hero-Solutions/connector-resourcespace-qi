@@ -114,7 +114,6 @@ class TestCommand extends Command
         $this->importedResources = [];
         foreach($importedResourcesObjects as $importedResource) {
             $this->importedResources[$importedResource->getResourceId()] = $importedResource;
-            $httpUtil->get($qiReindexUrl . $importedResource->getObjectId());
         }
 
         $this->resourceSpace = new ResourceSpace($rsConfig['api']);
