@@ -399,7 +399,7 @@ class Qi
                             $results[] = $res;
                         }
                     }
-                    $concat = '\n\n';
+                    $concat = PHP_EOL . PHP_EOL;
                     if(array_key_exists('concat', $field)) {
                         $concat = $field['concat'];
                     }
