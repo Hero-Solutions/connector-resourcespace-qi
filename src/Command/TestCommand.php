@@ -5,6 +5,7 @@ namespace App\Command;
 use App\Entity\Resource;
 use App\Qi\Qi;
 use App\ResourceSpace\ResourceSpace;
+use App\Util\HttpUtil;
 use App\Util\StringUtil;
 use DateTime;
 use Doctrine\ORM\EntityManagerInterface;
@@ -94,12 +95,15 @@ class TestCommand extends Command
 
         $qiConfig = $this->params->get('qi');
         $qiUrl = $qiConfig['url'];
+        $qiReindexUrl = $qiConfig['reindex_url'];
         $qiLinkDamsPrefix = $qiConfig['link_dams_prefix'];
         $qiMediaFolderId = $qiConfig['media_folder_id'];
         $qiImportMapping = $qiConfig['import_mapping'];
         $qiMappingToSelf = $qiConfig['mapping_to_self'];
 
         $sslCertificateAuthority = $this->params->get('ssl_certificate_authority');
+
+        $httpUtil = new HttpUtil($sslCertificateAuthority, $debug);
 
         /* @var $importedResourcesObjects Resource[] */
         $importedResourcesObjects = $this->entityManager->createQueryBuilder()
@@ -110,6 +114,7 @@ class TestCommand extends Command
         $this->importedResources = [];
         foreach($importedResourcesObjects as $importedResource) {
             $this->importedResources[$importedResource->getResourceId()] = $importedResource;
+            $httpUtil->get($qiReindexUrl . $importedResource->getObjectId());
         }
 
         $this->resourceSpace = new ResourceSpace($rsConfig['api']);

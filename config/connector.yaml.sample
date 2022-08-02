@@ -163,6 +163,7 @@ parameters:
 
   qi:
     url: ''
+    reindex_url: ''
     api:
       url: ''
       username: ''
