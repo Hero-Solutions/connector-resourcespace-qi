@@ -38,6 +38,9 @@ class TestCommand extends Command
     /* @var $importedResources Resource[] */
     private $importedResources;
 
+    private $httpUtil;
+    private $qiReindexUrl;
+
     protected function configure()
     {
         $this
@@ -95,7 +98,7 @@ class TestCommand extends Command
 
         $qiConfig = $this->params->get('qi');
         $qiUrl = $qiConfig['url'];
-        $qiReindexUrl = $qiConfig['reindex_url'];
+        $this->qiReindexUrl = $qiConfig['reindex_url'];
         $qiLinkDamsPrefix = $qiConfig['link_dams_prefix'];
         $qiMediaFolderId = $qiConfig['media_folder_id'];
         $qiImportMapping = $qiConfig['import_mapping'];
@@ -103,7 +106,7 @@ class TestCommand extends Command
 
         $sslCertificateAuthority = $this->params->get('ssl_certificate_authority');
 
-        $httpUtil = new HttpUtil($sslCertificateAuthority, $debug);
+        $this->httpUtil = new HttpUtil($sslCertificateAuthority, $debug);
 
         /* @var $importedResourcesObjects Resource[] */
         $importedResourcesObjects = $this->entityManager->createQueryBuilder()
@@ -114,6 +117,9 @@ class TestCommand extends Command
         $this->importedResources = [];
         foreach($importedResourcesObjects as $importedResource) {
             $this->importedResources[$importedResource->getResourceId()] = $importedResource;
+            if($importedResource->getLinked() === 0) {
+                $this->httpUtil->get($this->qiReindexUrl . $importedResource->getObjectId());
+            }
         }
 
         $this->resourceSpace = new ResourceSpace($rsConfig['api']);
@@ -184,6 +190,7 @@ class TestCommand extends Command
                         if ($this->filenamesMatch($resourceId, $rsFilename, $image['filename'])) {
                             $hasMatchingImage = true;
                             $this->qi->updateMetadata($image, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true);
+                            $this->httpUtil->get($this->qiReindexUrl . $object->id);
 
                             $resource = new Resource();
                             $resource->setImportTimestamp(new DateTime());
@@ -416,6 +423,7 @@ class TestCommand extends Command
                         $qiImage = $this->qi->getMatchingImageToBeLinked($images, $ir->getOriginalFilename(), $ir->getWidth(), $ir->getHeight(), $ir->getFilesize(), $qiMediaFolderId);
                         if ($qiImage !== null) {
                             $this->qi->updateMetadata($qiImage, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true);
+                            $this->httpUtil->get($this->qiReindexUrl . $ir->getObjectId());
                             $ir->setLinked(1);
                             $this->entityManager->persist($ir);
                             $this->linkedResources[$ir->getResourceId()] = $ir->getResourceId();
