@@ -16,7 +16,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 
-class TestCommand extends Command
+class ProcessCommand extends Command
 {
     private $params;
     /* @var $entityManager EntityManagerInterface */
@@ -44,8 +44,8 @@ class TestCommand extends Command
     protected function configure()
     {
         $this
-            ->setName('app:test')
-            ->setDescription('Test');
+            ->setName('app:process')
+            ->setDescription('Links ResourceSpace resources to Qi objects, offloads resources where needed and exchanges metadata between both systems.');
     }
 
     public function __construct(ParameterBagInterface $params, EntityManagerInterface $entityManager)
@@ -58,11 +58,11 @@ class TestCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $this->verbose = $input->getOption('verbose');
-        $this->test();
+        $this->process();
         return 0;
     }
 
-    private function test()
+    private function process()
     {
         $test = $this->params->get('test');
         $debug = $this->params->get('debug');
@@ -474,7 +474,7 @@ class TestCommand extends Command
                                     $changed = false;
                                     if (!array_key_exists($key, $image)) {
                                         $changed = true;
-                                    } else if ($image[$key] !== $result) {
+                                    } else if ($image[$key] !== $result && !(empty($image[$key]) && empty($result))) {
                                         $changed = true;
                                     }
                                     if ($changed) {
