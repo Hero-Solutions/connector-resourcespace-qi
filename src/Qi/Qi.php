@@ -174,7 +174,7 @@ class Qi
             foreach($translatedCredits as $qiField => $credit) {
                 $changed = false;
                 if(array_key_exists($qiField, $qiImage)) {
-                    if($qiImage[$qiField] !== $credit) {
+                    if($qiImage[$qiField] !== $credit && !(empty($qiImage[$qiField]) && empty($credit))) {
                         $changed = true;
                     }
                 } else {
@@ -186,7 +186,16 @@ class Qi
             }
         } else {
             foreach($this->creditConfig['languages'] as $language) {
-                $record[$this->creditConfig['qi_field_prefix'] . '_' . $language] = '';
+                $key = $this->creditConfig['qi_field_prefix'] . '_' . $language;
+                $changed = false;
+                if(array_key_exists($key, $qiImage)) {
+                    if(!empty($qiImage[$key])) {
+                        $changed = true;
+                    }
+                }
+                if($changed) {
+                    $record[$key] = '';
+                }
             }
         }
 
