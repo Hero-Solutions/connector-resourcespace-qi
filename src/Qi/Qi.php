@@ -282,8 +282,21 @@ class Qi
                     if($res !== null) {
                         $update = true;
                         if(array_key_exists($fieldId, $resource)) {
-                            if($resource[$fieldId] === $res) {
+                            if($resource[$fieldId] === $res || empty($resource[$field]) && empty($res)) {
                                 $update = false;
+                            } else {
+                                // Mostly for keywords, check if both fields contain the same comma-separated values but in a different order
+                                $expl1 = explode(',', $resource[$fieldId]);
+                                $expl2 = explode(',', $res);
+                                if(count($expl1) === count($expl2)) {
+                                    $update = false;
+                                    foreach($expl1 as $val) {
+                                        if(!in_array($val, $expl2)) {
+                                            $update = true;
+                                            break;
+                                        }
+                                    }
+                                }
                             }
                         }
                         if($update) {
