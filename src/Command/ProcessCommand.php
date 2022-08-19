@@ -410,7 +410,9 @@ class ProcessCommand extends Command
                                 }
                                 $this->resourcesByInventoryNumber[$inventoryNumber][] = $resource;
                                 $ending = "9999999999999999999";
-                                if(preg_match('/^.*_M?[0-9]+$/', $filenameWithoutExtension)) {
+                                if(preg_match('/^.*_M?[0-9]+_ret$/', $filenameWithoutExtension)) {
+                                    $ending = preg_replace('/^.*_(M?[0-9]+_ret)$/', '$1', $filenameWithoutExtension);
+                                } else if(preg_match('/^.*_M?[0-9]+$/', $filenameWithoutExtension)) {
                                     $ending = preg_replace('/^.*_(M?[0-9]+)$/', '$1', $filenameWithoutExtension);
                                 }
                                 if(!array_key_exists($inventoryNumber, $tmpResourcesByFilename)) {
