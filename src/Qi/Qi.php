@@ -77,7 +77,7 @@ class Qi
                 }
             }
         }
-        for($i = 1; !$this->test && $i < ($count + 499) / 500 - 1; $i++) {
+        for($i = 1; !$this->test && $i <= intval(($count + 499) / 500) - 1; $i++) {
             $objsJson = $this->get($this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields) . '/_offset/' . ($i * 500));
             $objs = json_decode($objsJson);
             $records = $objs->records;
