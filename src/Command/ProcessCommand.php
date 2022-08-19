@@ -409,6 +409,8 @@ class ProcessCommand extends Command
                                     $this->resourcesByInventoryNumber[$inventoryNumber] = [];
                                 }
                                 $this->resourcesByInventoryNumber[$inventoryNumber][] = $resource;
+
+                                // Sort the resources based on the postfix in their filename (_01, _01_ret, _02, ..., _M01, _M02, ...)
                                 $ending = "9999999999999999999";
                                 if(preg_match('/^.*_M?[0-9]+_ret$/', $filenameWithoutExtension)) {
                                     $ending = preg_replace('/^.*_(M?[0-9]+_ret)$/', '$1', $filenameWithoutExtension);
