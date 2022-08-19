@@ -152,7 +152,7 @@ class ProcessCommand extends Command
 
         $uploaded = 0;
 
-        foreach ($this->resourcesByFilename as $filename => $resourcesByEnding) {
+        foreach ($this->resourcesByFilename as $inventoryNumber => $resourcesByEnding) {
             foreach($resourcesByEnding as $ending => $resources) {
                 foreach ($resources as $resourceId => $resource) {
                     // Skip resources that are already linked to an object in Qi
@@ -412,15 +412,14 @@ class ProcessCommand extends Command
                                 $ending = "9999999999999999999";
                                 if(preg_match('/^.*_M?[0-9]+$/', $filenameWithoutExtension)) {
                                     $ending = preg_replace('/^.*_(M?[0-9]+)$/', '$1', $filenameWithoutExtension);
-                                    $filenameWithoutExtension = preg_replace('/^(.*)_M?[0-9]+$/', '$1', $filenameWithoutExtension);
                                 }
-                                if(!array_key_exists($filenameWithoutExtension, $this->resourcesByFilename)) {
-                                    $tmpResourcesByFilename[$filenameWithoutExtension] = [];
+                                if(!array_key_exists($inventoryNumber, $this->resourcesByFilename)) {
+                                    $tmpResourcesByFilename[$inventoryNumber] = [];
                                 }
                                 if(!array_key_exists($ending, $this->resourcesByFilename)) {
-                                    $tmpResourcesByFilename[$filenameWithoutExtension][$ending] = [];
+                                    $tmpResourcesByFilename[$inventoryNumber][$ending] = [];
                                 }
-                                $tmpResourcesByFilename[$filenameWithoutExtension][$ending][$resourceId] = $resource;
+                                $tmpResourcesByFilename[$inventoryNumber][$ending][$resourceId] = $resource;
                             }
                         }
                     }
@@ -429,9 +428,9 @@ class ProcessCommand extends Command
                 }
             }
         }
-        foreach($tmpResourcesByFilename as $filename => $resourcesByEnding) {
+        foreach($tmpResourcesByFilename as $inventoryNumber => $resourcesByEnding) {
             ksort($resourcesByEnding);
-            $this->resourcesByFilename[$filename] = $resourcesByEnding;
+            $this->resourcesByFilename[$inventoryNumber] = $resourcesByEnding;
         }
     }
 
