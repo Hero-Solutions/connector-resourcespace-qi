@@ -153,120 +153,76 @@ class ProcessCommand extends Command
         $uploaded = 0;
 
         foreach ($this->resourcesByFilename as $filename => $resourcesByEnding) {
-            foreach($resourcesByEnding as $resourceId => $resource) {
-                // Skip resources that are already linked to an object in Qi
-                if (array_key_exists($resourceId, $this->linkedResources)) {
-                    continue;
-                }
-                $inventoryNumber = $resource[$rsFields['inventorynumber']];
-                if (empty($inventoryNumber)) {
-                    continue;
-                }
-                if (!array_key_exists($inventoryNumber, $this->objectsByInventoryNumber)) {
-                    continue;
-                }
-
-                $object = $this->objectsByInventoryNumber[$inventoryNumber];
-                $rsFilename = $resource[$rsFields['originalfilename']];
-                $hasMatchingImage = false;
-
-                $resourceIsLinked = false;
-                if (array_key_exists($resourceId, $this->importedResources)) {
-                    if ($this->importedResources[$resourceId]->getObjectId() === intval($object->id)) {
-                        $resourceIsLinked = true;
+            foreach($resourcesByEnding as $ending => $resources) {
+                foreach ($resources as $resourceId => $resource) {
+                    // Skip resources that are already linked to an object in Qi
+                    if (array_key_exists($resourceId, $this->linkedResources)) {
+                        continue;
                     }
-                }
+                    $inventoryNumber = $resource[$rsFields['inventorynumber']];
+                    if (empty($inventoryNumber)) {
+                        continue;
+                    }
+                    if (!array_key_exists($inventoryNumber, $this->objectsByInventoryNumber)) {
+                        continue;
+                    }
 
-                foreach ($this->qiImages[$object->id] as $image) {
-                    if ($this->qi->hasLinkDams($image)) {
-                        if ($image['link_dams'] === $qiLinkDamsPrefix . $resourceId) {
-                            $hasMatchingImage = true;
-                            $this->qi->updateMetadata($image, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, false);
+                    $object = $this->objectsByInventoryNumber[$inventoryNumber];
+                    $rsFilename = $resource[$rsFields['originalfilename']];
+                    $hasMatchingImage = false;
+
+                    $resourceIsLinked = false;
+                    if (array_key_exists($resourceId, $this->importedResources)) {
+                        if ($this->importedResources[$resourceId]->getObjectId() === intval($object->id)) {
+                            $resourceIsLinked = true;
                         }
-                    } else if (!$resourceIsLinked && array_key_exists('filename', $image)) {
-                        $fromRS = true;
-                        if (!array_key_exists('media_folder_id', $image)) {
-                            $fromRS = false;
-                        } else if ($image['media_folder_id'] !== $qiMediaFolderId) {
-                            $fromRS = false;
-                        }
-                        if (!$fromRS) {
-                            if ($this->filenamesMatch($resourceId, $rsFilename, $image['filename'])) {
+                    }
+
+                    foreach ($this->qiImages[$object->id] as $image) {
+                        if ($this->qi->hasLinkDams($image)) {
+                            if ($image['link_dams'] === $qiLinkDamsPrefix . $resourceId) {
                                 $hasMatchingImage = true;
-                                $this->qi->updateMetadata($image, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true);
-                                $this->httpUtil->get($this->qiReindexUrl . $object->id);
-
-                                $resource = new Resource();
-                                $resource->setImportTimestamp(new DateTime());
-                                $resource->setResourceId($resourceId);
-                                $resource->setObjectId($object->id);
-                                $resource->setInventoryNumber($inventoryNumber);
-                                if (array_key_exists('original_filename', $image)) {
-                                    if (!empty($image['original_filename'])) {
-                                        $resource->setOriginalFilename($image['original_filename']);
-                                    }
-                                }
-                                if (array_key_exists('width', $image)) {
-                                    if (!empty($image['width'])) {
-                                        $resource->setWidth(intval($image['width']));
-                                    }
-                                }
-                                if (array_key_exists('height', $image)) {
-                                    if (!empty($image['height'])) {
-                                        $resource->setHeight(intval($image['height']));
-                                    }
-                                }
-                                if (array_key_exists('filesize', $image)) {
-                                    if (!empty($image['filesize'])) {
-                                        $resource->setFilesize(intval($image['filesize']));
-                                    }
-                                }
-                                $resource->setLinked(2);
-                                $this->entityManager->persist($resource);
-                                $this->importedResources[$resourceId] = $resource;
-                                $uploaded++;
-                                if ($uploaded % 100 === 0) {
-                                    $this->entityManager->flush();
-                                }
+                                $this->qi->updateMetadata($image, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, false);
                             }
-                        }
-                    }
-                }
-                if ($hasMatchingImage) {
-                    $this->qi->updateResourceSpaceData($object, $resource, $resourceId, $rsFields, $rsImportMapping, $rsFullDataFields, $qiUrl, $this->resourceSpace);
-                } else if (!$resourceIsLinked && !array_key_exists($object->id, $this->objectIdsUploadedTo)) {
-                    $allImages = $this->resourceSpace->getAllImages($resourceId);
-                    foreach ($fileSizes as $fileSize) {
-                        $found = false;
-                        foreach ($allImages as $image) {
-                            if ($image['size_code'] === $fileSize) {
-                                $found = true;
-                                $filename = $object->id . '-1.' . $image['extension'];
-                                $this->objectIdsUploadedTo[$object->id] = $object->id;
-                                echo 'Uploading resource ' . $resourceId . ' to ' . $filename . ' (inventory number ' . $inventoryNumber . ').' . PHP_EOL;
-                                if ($this->update) {
-                                    if (!is_dir($ftpFolder)) {
-                                        mkdir($ftpFolder, 0700, true);
-                                        chown($ftpFolder, $ftpUser);
-                                        chgrp($ftpFolder, $ftpGroup);
-                                    }
-                                    $path = $ftpFolder . $filename;
-                                    copy($image['url'], $path);
-                                    chown($path, $ftpUser);
-                                    chgrp($path, $ftpGroup);
-                                    chmod($path, 0600);
+                        } else if (!$resourceIsLinked && array_key_exists('filename', $image)) {
+                            $fromRS = true;
+                            if (!array_key_exists('media_folder_id', $image)) {
+                                $fromRS = false;
+                            } else if ($image['media_folder_id'] !== $qiMediaFolderId) {
+                                $fromRS = false;
+                            }
+                            if (!$fromRS) {
+                                if ($this->filenamesMatch($resourceId, $rsFilename, $image['filename'])) {
+                                    $hasMatchingImage = true;
+                                    $this->qi->updateMetadata($image, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true);
+                                    $this->httpUtil->get($this->qiReindexUrl . $object->id);
 
                                     $resource = new Resource();
                                     $resource->setImportTimestamp(new DateTime());
                                     $resource->setResourceId($resourceId);
                                     $resource->setObjectId($object->id);
                                     $resource->setInventoryNumber($inventoryNumber);
-                                    $resource->setOriginalFilename($filename);
-                                    $size = getimagesize($path);
-                                    $resource->setWidth($size[0]);
-                                    $resource->setHeight($size[1]);
-                                    $resource->setFilesize(filesize($path));
-                                    $resource->setLinked(0);
+                                    if (array_key_exists('original_filename', $image)) {
+                                        if (!empty($image['original_filename'])) {
+                                            $resource->setOriginalFilename($image['original_filename']);
+                                        }
+                                    }
+                                    if (array_key_exists('width', $image)) {
+                                        if (!empty($image['width'])) {
+                                            $resource->setWidth(intval($image['width']));
+                                        }
+                                    }
+                                    if (array_key_exists('height', $image)) {
+                                        if (!empty($image['height'])) {
+                                            $resource->setHeight(intval($image['height']));
+                                        }
+                                    }
+                                    if (array_key_exists('filesize', $image)) {
+                                        if (!empty($image['filesize'])) {
+                                            $resource->setFilesize(intval($image['filesize']));
+                                        }
+                                    }
+                                    $resource->setLinked(2);
                                     $this->entityManager->persist($resource);
                                     $this->importedResources[$resourceId] = $resource;
                                     $uploaded++;
@@ -274,11 +230,57 @@ class ProcessCommand extends Command
                                         $this->entityManager->flush();
                                     }
                                 }
-                                break;
                             }
                         }
-                        if ($found) {
-                            break;
+                    }
+                    if ($hasMatchingImage) {
+                        $this->qi->updateResourceSpaceData($object, $resource, $resourceId, $rsFields, $rsImportMapping, $rsFullDataFields, $qiUrl, $this->resourceSpace);
+                    } else if (!$resourceIsLinked && !array_key_exists($object->id, $this->objectIdsUploadedTo)) {
+                        $allImages = $this->resourceSpace->getAllImages($resourceId);
+                        foreach ($fileSizes as $fileSize) {
+                            $found = false;
+                            foreach ($allImages as $image) {
+                                if ($image['size_code'] === $fileSize) {
+                                    $found = true;
+                                    $filename = $object->id . '-1.' . $image['extension'];
+                                    $this->objectIdsUploadedTo[$object->id] = $object->id;
+                                    echo 'Uploading resource ' . $resourceId . ' to ' . $filename . ' (inventory number ' . $inventoryNumber . ').' . PHP_EOL;
+                                    if ($this->update) {
+                                        if (!is_dir($ftpFolder)) {
+                                            mkdir($ftpFolder, 0700, true);
+                                            chown($ftpFolder, $ftpUser);
+                                            chgrp($ftpFolder, $ftpGroup);
+                                        }
+                                        $path = $ftpFolder . $filename;
+                                        copy($image['url'], $path);
+                                        chown($path, $ftpUser);
+                                        chgrp($path, $ftpGroup);
+                                        chmod($path, 0600);
+
+                                        $resource = new Resource();
+                                        $resource->setImportTimestamp(new DateTime());
+                                        $resource->setResourceId($resourceId);
+                                        $resource->setObjectId($object->id);
+                                        $resource->setInventoryNumber($inventoryNumber);
+                                        $resource->setOriginalFilename($filename);
+                                        $size = getimagesize($path);
+                                        $resource->setWidth($size[0]);
+                                        $resource->setHeight($size[1]);
+                                        $resource->setFilesize(filesize($path));
+                                        $resource->setLinked(0);
+                                        $this->entityManager->persist($resource);
+                                        $this->importedResources[$resourceId] = $resource;
+                                        $uploaded++;
+                                        if ($uploaded % 100 === 0) {
+                                            $this->entityManager->flush();
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                            if ($found) {
+                                break;
+                            }
                         }
                     }
                 }
@@ -430,9 +432,6 @@ class ProcessCommand extends Command
         foreach($tmpResourcesByFilename as $filename => $resourcesByEnding) {
             ksort($resourcesByEnding);
             $this->resourcesByFilename[$filename] = $resourcesByEnding;
-        }
-        if($this->debug) {
-            var_dump($this->resourcesByFilename);
         }
     }
 
