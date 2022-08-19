@@ -413,10 +413,10 @@ class ProcessCommand extends Command
                                 if(preg_match('/^.*_M?[0-9]+$/', $filenameWithoutExtension)) {
                                     $ending = preg_replace('/^.*_(M?[0-9]+)$/', '$1', $filenameWithoutExtension);
                                 }
-                                if(!array_key_exists($inventoryNumber, $this->resourcesByFilename)) {
+                                if(!array_key_exists($inventoryNumber, $tmpResourcesByFilename)) {
                                     $tmpResourcesByFilename[$inventoryNumber] = [];
                                 }
-                                if(!array_key_exists($ending, $this->resourcesByFilename)) {
+                                if(!array_key_exists($ending, $tmpResourcesByFilename)) {
                                     $tmpResourcesByFilename[$inventoryNumber][$ending] = [];
                                 }
                                 $tmpResourcesByFilename[$inventoryNumber][$ending][$resourceId] = $resource;
