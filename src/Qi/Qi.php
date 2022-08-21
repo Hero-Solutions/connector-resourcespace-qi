@@ -282,7 +282,7 @@ class Qi
                     if($res !== null) {
                         $update = true;
                         if(array_key_exists($fieldId, $resource)) {
-                            if($resource[$fieldId] === $res || empty($resource[$field]) && empty($res)) {
+                            if($resource[$fieldId] === $res || empty($resource[$fieldId]) && empty($res)) {
                                 $update = false;
                             } else {
                                 // Mostly for keywords, check if both fields contain the same comma-separated values but in a different order
