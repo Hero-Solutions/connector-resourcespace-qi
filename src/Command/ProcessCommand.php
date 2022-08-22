@@ -450,8 +450,7 @@ class ProcessCommand extends Command
     private function unlinkDeletedMedia($qiLinkDamsPrefix)
     {
         $i = 0;
-        for($index = count($this->importedResources) - 1; $index >= 0; $index--) {
-            $ir = $this->importedResources[$index];
+        foreach($this->importedResources as $resourceId => $ir) {
             if($ir->getLinked() > 0) {
                 if(array_key_exists($ir->getObjectId(), $this->objectsByObjectId) && array_key_exists($ir->getInventoryNumber(), $this->objectsByInventoryNumber)) {
                     if($this->objectsByObjectId[$ir->getObjectId()] === $this->objectsByInventoryNumber[$ir->getInventoryNumber()]) {
@@ -467,7 +466,7 @@ class ProcessCommand extends Command
                         }
                         if(!$linked) {
                             echo 'Unlink resource ' . $ir->getResourceId() . ' from object ' . $ir->getObjectId() . ' (inv. ' . $ir->getInventoryNumber() . ')' . PHP_EOL;
-                            unset($this->importedResources[$index]);
+                            unset($this->importedResources[$resourceId]);
                             if($this->update) {
                                 $unlinkedResource = new UnlinkedResource();
                                 $unlinkedResource->setImportTimestamp($ir->getImportTimestamp());
