@@ -16,6 +16,7 @@ CREATE TABLE `resource` (
     PRIMARY KEY(resource_id, object_id)
 );
 CREATE TABLE `unlinked_resource` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `import_timestamp` TIMESTAMP NOT NULL,
     `resource_id` INT UNSIGNED NOT NULL,
     `object_id` INT UNSIGNED NOT NULL,
