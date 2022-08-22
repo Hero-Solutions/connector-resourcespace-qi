@@ -6,10 +6,10 @@ use Doctrine\ORM\Mapping as ORM;
 
 /**
  * @ORM\Entity
- * @ORM\Table(name="resource")
+ * @ORM\Table(name="unlinked_resource")
  */
 
-class Resource
+class UnlinkedResource
 {
     /**
      * @ORM\Column(type="datetime")
@@ -17,13 +17,11 @@ class Resource
     private $importTimestamp;
 
     /**
-     * @ORM\Id()
      * @ORM\Column(type="integer")
      */
     private $resourceId;
 
     /**
-     * @ORM\Id()
      * @ORM\Column(type="integer")
      */
     private $objectId;

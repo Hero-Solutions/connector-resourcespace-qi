@@ -15,4 +15,15 @@ CREATE TABLE `resource` (
     `linked` TINYINT UNSIGNED NOT NULL DEFAULT 0,
     PRIMARY KEY(resource_id, object_id)
 );
+CREATE TABLE `unlinked_resource` (
+    `import_timestamp` TIMESTAMP NOT NULL,
+    `resource_id` INT UNSIGNED NOT NULL,
+    `object_id` INT UNSIGNED NOT NULL,
+    `inventory_number` VARCHAR(255) NOT NULL,
+    `original_filename` VARCHAR(255) NOT NULL,
+    `width` INT UNSIGNED NOT NULL DEFAULT 0,
+    `height` INT UNSIGNED NOT NULL DEFAULT 0,
+    `filesize` INT UNSIGNED NOT NULL DEFAULT 0,
+    `linked` TINYINT UNSIGNED NOT NULL DEFAULT 0
+);
 ```

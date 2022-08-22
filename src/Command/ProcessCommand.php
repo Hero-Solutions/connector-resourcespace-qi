@@ -3,6 +3,7 @@
 namespace App\Command;
 
 use App\Entity\Resource;
+use App\Entity\UnlinkedResource;
 use App\Qi\Qi;
 use App\ResourceSpace\ResourceSpace;
 use App\Util\HttpUtil;
@@ -144,6 +145,9 @@ class ProcessCommand extends Command
         $this->objectIdsUploadedTo = [];
         $this->linkedResources = [];
 
+        // Remove the links in the database that no longer exist (most likely manually removed in Qi)
+        $this->unlinkDeletedMedia($qiLinkDamsPrefix);
+
         // Add Link DAMS and metadata to images in Qi that were imported in a previous run
         $this->linkImportedResources($rsFields, $qiImportMapping, $qiMediaFolderId, $qiLinkDamsPrefix);
 
@@ -194,41 +198,44 @@ class ProcessCommand extends Command
                             if (!$fromRS) {
                                 if ($this->filenamesMatch($resourceId, $rsFilename, $image['filename'])) {
                                     $hasMatchingImage = true;
-                                    $this->qi->updateMetadata($image, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true);
-                                    $this->httpUtil->get($this->qiReindexUrl . $object->id);
+                                    echo 'Found matching image ' . $resourceId . ' for object' . $object->id . ' (inv ' . $inventoryNumber . ')' . PHP_EOL;
+                                    if($this->update) {
+                                        $this->qi->updateMetadata($image, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true);
+                                        $this->httpUtil->get($this->qiReindexUrl . $object->id);
 
-                                    $resource = new Resource();
-                                    $resource->setImportTimestamp(new DateTime());
-                                    $resource->setResourceId($resourceId);
-                                    $resource->setObjectId($object->id);
-                                    $resource->setInventoryNumber($inventoryNumber);
-                                    if (array_key_exists('original_filename', $image)) {
-                                        if (!empty($image['original_filename'])) {
-                                            $resource->setOriginalFilename($image['original_filename']);
+                                        $resource = new Resource();
+                                        $resource->setImportTimestamp(new DateTime());
+                                        $resource->setResourceId($resourceId);
+                                        $resource->setObjectId($object->id);
+                                        $resource->setInventoryNumber($inventoryNumber);
+                                        if (array_key_exists('original_filename', $image)) {
+                                            if (!empty($image['original_filename'])) {
+                                                $resource->setOriginalFilename($image['original_filename']);
+                                            }
+                                        }
+                                        if (array_key_exists('width', $image)) {
+                                            if (!empty($image['width'])) {
+                                                $resource->setWidth(intval($image['width']));
+                                            }
+                                        }
+                                        if (array_key_exists('height', $image)) {
+                                            if (!empty($image['height'])) {
+                                                $resource->setHeight(intval($image['height']));
+                                            }
+                                        }
+                                        if (array_key_exists('filesize', $image)) {
+                                            if (!empty($image['filesize'])) {
+                                                $resource->setFilesize(intval($image['filesize']));
+                                            }
+                                        }
+                                        $resource->setLinked(2);
+                                        $this->entityManager->persist($resource);
+                                        $uploaded++;
+                                        if ($uploaded % 100 === 0) {
+                                            $this->entityManager->flush();
                                         }
                                     }
-                                    if (array_key_exists('width', $image)) {
-                                        if (!empty($image['width'])) {
-                                            $resource->setWidth(intval($image['width']));
-                                        }
-                                    }
-                                    if (array_key_exists('height', $image)) {
-                                        if (!empty($image['height'])) {
-                                            $resource->setHeight(intval($image['height']));
-                                        }
-                                    }
-                                    if (array_key_exists('filesize', $image)) {
-                                        if (!empty($image['filesize'])) {
-                                            $resource->setFilesize(intval($image['filesize']));
-                                        }
-                                    }
-                                    $resource->setLinked(2);
-                                    $this->entityManager->persist($resource);
                                     $this->importedResources[$resourceId] = $resource;
-                                    $uploaded++;
-                                    if ($uploaded % 100 === 0) {
-                                        $this->entityManager->flush();
-                                    }
                                 }
                             }
                         }
@@ -437,6 +444,55 @@ class ProcessCommand extends Command
         foreach($tmpResourcesByFilename as $inventoryNumber => $resourcesByEnding) {
             ksort($resourcesByEnding);
             $this->resourcesByFilename[$inventoryNumber] = $resourcesByEnding;
+        }
+    }
+
+    private function unlinkDeletedMedia($qiLinkDamsPrefix)
+    {
+        $i = 0;
+        for($index = count($this->importedResources) - 1; $index >= 0; $index--) {
+            $ir = $this->importedResources[$index];
+            if($ir->getLinked() > 0) {
+                if(array_key_exists($ir->getObjectId(), $this->objectsByObjectId) && array_key_exists($ir->getInventoryNumber(), $this->objectsByInventoryNumber)) {
+                    if($this->objectsByObjectId[$ir->getObjectId()] === $this->objectsByInventoryNumber[$ir->getInventoryNumber()]) {
+                        $linked = false;
+                        $images = $this->qiImages[$ir->getObjectId()];
+                        foreach($images as $image) {
+                            if (array_key_exists('link_dams', $image)) {
+                                if($image['link_dams'] === $qiLinkDamsPrefix . $ir->getResourceId()) {
+                                    $linked = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if(!$linked) {
+                            echo 'Unlink resource ' . $ir->getResourceId() . ' from object ' . $ir->getObjectId() . ' (inv. ' . $ir->getInventoryNumber() . ')' . PHP_EOL;
+                            unset($this->importedResources[$index]);
+                            if($this->update) {
+                                $unlinkedResource = new UnlinkedResource();
+                                $unlinkedResource->setImportTimestamp($ir->getImportTimestamp());
+                                $unlinkedResource->setResourceId($ir->getResourceId());
+                                $unlinkedResource->setObjectId($ir->getObjectId());
+                                $unlinkedResource->setInventoryNumber($ir->getInventoryNumber());
+                                $unlinkedResource->setOriginalFilename($ir->getOriginalFilename());
+                                $unlinkedResource->setWidth($ir->getWidth());
+                                $unlinkedResource->setHeight($ir->getHeight());
+                                $unlinkedResource->setFilesize($ir->getFilesize());
+                                $unlinkedResource->setLinked($ir->getLinked());
+                                $this->entityManager->persist($unlinkedResource);
+                                $this->entityManager->remove($ir);
+                                $i++;
+                                if($i % 50 === 0) {
+                                    $this->entityManager->flush();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if($i > 0) {
+            $this->entityManager->flush();
         }
     }
 
