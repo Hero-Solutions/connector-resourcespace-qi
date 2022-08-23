@@ -10,7 +10,6 @@ use App\Util\HttpUtil;
 use App\Util\StringUtil;
 use DateTime;
 use Doctrine\ORM\EntityManagerInterface;
-use JsonPath\InvalidJsonException;
 use JsonPath\JsonObject;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -122,7 +121,9 @@ class ProcessCommand extends Command
         foreach($importedResourcesObjects as $importedResource) {
             $this->importedResources[$importedResource->getResourceId()] = $importedResource;
             if($importedResource->getLinked() === 0) {
-                $this->httpUtil->get($this->qiReindexUrl . $importedResource->getObjectId());
+                if($this->update) {
+                    $this->httpUtil->get($this->qiReindexUrl . $importedResource->getObjectId());
+                }
             }
         }
 
@@ -508,15 +509,17 @@ class ProcessCommand extends Command
                         $resource = $this->resourcesByResourceId[$ir->getResourceId()];
                         $qiImage = $this->qi->getMatchingImageToBeLinked($images, $ir->getOriginalFilename(), $ir->getWidth(), $ir->getHeight(), $ir->getFilesize(), $qiMediaFolderId);
                         if ($qiImage !== null) {
-                            $this->qi->updateMetadata($qiImage, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true);
-                            $this->httpUtil->get($this->qiReindexUrl . $ir->getObjectId());
-                            $ir->setLinked(1);
-                            $this->entityManager->persist($ir);
-                            $this->linkedResources[$ir->getResourceId()] = $ir->getResourceId();
-                            $i++;
-                            if ($i % 100 === 0) {
-                                $this->entityManager->flush();
+                            if($this->update) {
+                                $this->qi->updateMetadata($qiImage, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true);
+                                $this->httpUtil->get($this->qiReindexUrl . $ir->getObjectId());
+                                $ir->setLinked(1);
+                                $this->entityManager->persist($ir);
+                                $i++;
+                                if ($i % 100 === 0) {
+                                    $this->entityManager->flush();
+                                }
                             }
+                            $this->linkedResources[$ir->getResourceId()] = $ir->getResourceId();
                         } else {
                             $this->objectIdsUploadedTo[$ir->getObjectId()] = $ir->getObjectId();
                             echo 'ERROR: No matching image found for resource ' . $ir->getResourceId() . ' with object ' . $ir->getObjectId() . ' (inventory number ' . $ir->getInventoryNumber() . ')' . PHP_EOL;
