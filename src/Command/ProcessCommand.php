@@ -204,39 +204,39 @@ class ProcessCommand extends Command
                                         $this->qi->updateMetadata($image, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true);
                                         $this->httpUtil->get($this->qiReindexUrl . $object->id);
 
-                                        $resource = new Resource();
-                                        $resource->setImportTimestamp(new DateTime());
-                                        $resource->setResourceId($resourceId);
-                                        $resource->setObjectId($object->id);
-                                        $resource->setInventoryNumber($inventoryNumber);
+                                        $resourceObject = new Resource();
+                                        $resourceObject->setImportTimestamp(new DateTime());
+                                        $resourceObject->setResourceId($resourceId);
+                                        $resourceObject->setObjectId($object->id);
+                                        $resourceObject->setInventoryNumber($inventoryNumber);
                                         if (array_key_exists('original_filename', $image)) {
                                             if (!empty($image['original_filename'])) {
-                                                $resource->setOriginalFilename($image['original_filename']);
+                                                $resourceObject->setOriginalFilename($image['original_filename']);
                                             }
                                         }
                                         if (array_key_exists('width', $image)) {
                                             if (!empty($image['width'])) {
-                                                $resource->setWidth(intval($image['width']));
+                                                $resourceObject->setWidth(intval($image['width']));
                                             }
                                         }
                                         if (array_key_exists('height', $image)) {
                                             if (!empty($image['height'])) {
-                                                $resource->setHeight(intval($image['height']));
+                                                $resourceObject->setHeight(intval($image['height']));
                                             }
                                         }
                                         if (array_key_exists('filesize', $image)) {
                                             if (!empty($image['filesize'])) {
-                                                $resource->setFilesize(intval($image['filesize']));
+                                                $resourceObject->setFilesize(intval($image['filesize']));
                                             }
                                         }
-                                        $resource->setLinked(2);
-                                        $this->entityManager->persist($resource);
+                                        $resourceObject->setLinked(2);
+                                        $this->entityManager->persist($resourceObject);
                                         $uploaded++;
                                         if ($uploaded % 100 === 0) {
                                             $this->entityManager->flush();
                                         }
                                     }
-                                    $this->importedResources[$resourceId] = $resource;
+                                    $this->importedResources[$resourceId] = $resourceObject;
                                 }
                             }
                         }
@@ -265,19 +265,19 @@ class ProcessCommand extends Command
                                         chgrp($path, $ftpGroup);
                                         chmod($path, 0600);
 
-                                        $resource = new Resource();
-                                        $resource->setImportTimestamp(new DateTime());
-                                        $resource->setResourceId($resourceId);
-                                        $resource->setObjectId($object->id);
-                                        $resource->setInventoryNumber($inventoryNumber);
-                                        $resource->setOriginalFilename($filename);
+                                        $resourceObject = new Resource();
+                                        $resourceObject->setImportTimestamp(new DateTime());
+                                        $resourceObject->setResourceId($resourceId);
+                                        $resourceObject->setObjectId($object->id);
+                                        $resourceObject->setInventoryNumber($inventoryNumber);
+                                        $resourceObject->setOriginalFilename($filename);
                                         $size = getimagesize($path);
-                                        $resource->setWidth($size[0]);
-                                        $resource->setHeight($size[1]);
-                                        $resource->setFilesize(filesize($path));
-                                        $resource->setLinked(0);
-                                        $this->entityManager->persist($resource);
-                                        $this->importedResources[$resourceId] = $resource;
+                                        $resourceObject->setWidth($size[0]);
+                                        $resourceObject->setHeight($size[1]);
+                                        $resourceObject->setFilesize(filesize($path));
+                                        $resourceObject->setLinked(0);
+                                        $this->entityManager->persist($resourceObject);
+                                        $this->importedResources[$resourceId] = $resourceObject;
                                         $uploaded++;
                                         if ($uploaded % 100 === 0) {
                                             $this->entityManager->flush();
