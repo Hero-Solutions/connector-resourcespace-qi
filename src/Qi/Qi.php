@@ -21,11 +21,12 @@ class Qi
     private $update;
     private $onlyOnlineRecords;
     private $unknownMappings = [];
+    private $httpUtil;
 
     private $objectsByObjectId;
     private $objectsByInventoryNumber;
 
-    public function __construct($qi, $sslCertificateAuthority, $creditConfig, $test, $debug, $update, $onlyOnlineRecords)
+    public function __construct($qi, $sslCertificateAuthority, $creditConfig, $test, $debug, $update, $onlyOnlineRecords, $httpUtil)
     {
         $qiApi = $qi['api'];
         $this->baseUrl = $qiApi['url'];
@@ -41,6 +42,8 @@ class Qi
         $this->debug = $debug;
         $this->update = $update;
         $this->onlyOnlineRecords = $onlyOnlineRecords;
+
+        $this->httpUtil = $httpUtil;
     }
 
     public function getObjectsByObjectId()
@@ -162,7 +165,7 @@ class Qi
         return $result;
     }
 
-    public function updateMetadata($qiImage, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, $addLinkDams)
+    public function updateMetadata($qiImage, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, $addLinkDams, $reindexUrl)
     {
         $resourceId = $resource['ref'];
         $record = [];
@@ -227,6 +230,7 @@ class Qi
                 'record' => $record
             ];
             self::putMetadata($data);
+            $this->httpUtil->get($reindexUrl);
         }
     }
 

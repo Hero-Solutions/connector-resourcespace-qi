@@ -132,7 +132,7 @@ class ProcessCommand extends Command
         $this->storeResources($allResources, $rsFields, $rsLinkWithCmsValue, $allowedExtensions, $forbiddenInventoryNumberPrefixes, $forbiddenFilenamePostfixes);
         echo count($this->resourcesByResourceId) . ' resources total for ' . count($this->resourcesByInventoryNumber) . ' unique inventory numbers.' . PHP_EOL;
 
-        $this->qi = new Qi($qiConfig, $sslCertificateAuthority, $creditConfig, $test, $this->debug, $this->update, $onlyOnlineRecords);
+        $this->qi = new Qi($qiConfig, $sslCertificateAuthority, $creditConfig, $test, $this->debug, $this->update, $onlyOnlineRecords, $this->httpUtil);
         $this->qi->retrieveAllObjects();
         $this->objectsByObjectId = $this->qi->getObjectsByObjectId();
         $this->objectsByInventoryNumber = $this->qi->getObjectsByInventoryNumber();
@@ -187,7 +187,7 @@ class ProcessCommand extends Command
                         if ($this->qi->hasLinkDams($image)) {
                             if ($image['link_dams'] === $qiLinkDamsPrefix . $resourceId) {
                                 $hasMatchingImage = true;
-                                $this->qi->updateMetadata($image, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, false);
+                                $this->qi->updateMetadata($image, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, false, $this->qiReindexUrl . $object->id);
                             }
                         } else if (!$resourceIsLinked && array_key_exists('filename', $image)) {
                             $fromRS = true;
@@ -201,8 +201,7 @@ class ProcessCommand extends Command
                                     $hasMatchingImage = true;
                                     echo 'Found matching image ' . $resourceId . ' for object' . $object->id . ' (inv ' . $inventoryNumber . ')' . PHP_EOL;
                                     if($this->update) {
-                                        $this->qi->updateMetadata($image, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true);
-                                        $this->httpUtil->get($this->qiReindexUrl . $object->id);
+                                        $this->qi->updateMetadata($image, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true, $this->qiReindexUrl . $object->id);
 
                                         $resourceObject = new Resource();
                                         $resourceObject->setImportTimestamp(new DateTime());
@@ -510,8 +509,7 @@ class ProcessCommand extends Command
                         $qiImage = $this->qi->getMatchingImageToBeLinked($images, $ir->getOriginalFilename(), $ir->getWidth(), $ir->getHeight(), $ir->getFilesize(), $qiMediaFolderId);
                         if ($qiImage !== null) {
                             if($this->update) {
-                                $this->qi->updateMetadata($qiImage, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true);
-                                $this->httpUtil->get($this->qiReindexUrl . $ir->getObjectId());
+                                $this->qi->updateMetadata($qiImage, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true, $this->qiReindexUrl . $ir->getObjectId());
                                 $ir->setLinked(1);
                                 $this->entityManager->persist($ir);
                                 $i++;
