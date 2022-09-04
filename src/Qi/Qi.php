@@ -293,9 +293,17 @@ class Qi
                                 $expl1 = explode(',', $resource[$fieldId]);
                                 $expl2 = explode(',', $res);
                                 if(count($expl1) === count($expl2)) {
-                                    $update = false;
+                                    $vals1 = [];
+                                    $vals2 = [];
                                     foreach($expl1 as $val) {
-                                        if(!in_array($val, $expl2)) {
+                                        $vals1[] = trim($val);
+                                    }
+                                    foreach($expl2 as $val) {
+                                        $vals2[] = trim($val);
+                                    }
+                                    $update = false;
+                                    foreach($vals1 as $val) {
+                                        if(!in_array($val, $vals2)) {
                                             $update = true;
                                             break;
                                         }
