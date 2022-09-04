@@ -262,7 +262,7 @@ class Qi
                     if($fetchFullData || array_key_exists($fieldName, $rsFullDataFields)) {
                         $fullRSData = $resourceSpace->getResourceData($resourceId);
                         if(array_key_exists($fieldName, $fullRSData)) {
-                            $resource[$rsFullDataFields[$fieldName]] = $fullRSData[$fieldName];
+                            $resource[$fieldId] = $fullRSData[$fieldName];
                         }
                     }
                     if(array_key_exists('overwrite', $field) && array_key_exists($fieldId, $resource)) {
