@@ -254,7 +254,7 @@ class Qi
                 if ($res !== null) {
                     $fieldId = $rsFields[$fieldName];
                     $fetchFullData = false;
-                    if(array_key_exists($resource, $fieldId)) {
+                    if(array_key_exists($fieldId, $resource)) {
                         if(strlen($resource[$fieldId]) >= 180) {
                             $fetchFullData = true;
                         }
@@ -267,28 +267,24 @@ class Qi
                     }
                     if(array_key_exists('overwrite', $field) && array_key_exists($fieldId, $resource)) {
                         if($field['overwrite'] === 'no') {
-                            if(array_key_exists($fieldId, $resource)) {
-                                if (!empty($resource[$fieldId])) {
-                                    if ($this->debug) {
-                                        echo 'Not overwriting field ' . $fieldName . ' for res ' . $res . ' (already has ' . $resource[$fieldId] . ')' . PHP_EOL;
-                                    }
-                                    $res = null;
+                            if (!empty($resource[$fieldId])) {
+                                if ($this->debug) {
+                                    echo 'Not overwriting field ' . $fieldName . ' for res ' . $res . ' (already has ' . $resource[$fieldId] . ')' . PHP_EOL;
                                 }
+                                $res = null;
                             }
                         } else if($field['overwrite'] === 'merge') {
-                            if(array_key_exists($fieldId, $resource)) {
-                                if (!empty($resource[$fieldId])) {
-                                    if (strpos($resource[$fieldId], $res) === false) {
-                                        if ($this->debug) {
-                                            echo 'Merging field ' . $fieldName . ' for res ' . $res . ' (already has ' . $resource[$fieldId] . ')' . PHP_EOL;
-                                        }
-                                        $res = $resource[$fieldId] . '\n\n' . $res;
-                                    } else {
-                                        if ($this->debug) {
-                                            echo 'Not merging field ' . $fieldName . ' for res ' . $res . ' (already has ' . $resource[$fieldId] . ')' . PHP_EOL;
-                                        }
-                                        $res = null;
+                            if (!empty($resource[$fieldId])) {
+                                if (strpos($resource[$fieldId], $res) === false) {
+                                    if ($this->debug) {
+                                        echo 'Merging field ' . $fieldName . ' for res ' . $res . ' (already has ' . $resource[$fieldId] . ')' . PHP_EOL;
                                     }
+                                    $res = $resource[$fieldId] . '\n\n' . $res;
+                                } else {
+                                    if ($this->debug) {
+                                        echo 'Not merging field ' . $fieldName . ' for res ' . $res . ' (already has ' . $resource[$fieldId] . ')' . PHP_EOL;
+                                    }
+                                    $res = null;
                                 }
                             }
                         }
