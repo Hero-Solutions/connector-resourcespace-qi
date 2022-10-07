@@ -7,12 +7,14 @@ class ResourceSpace
     private $apiUrl;
     private $apiUsername;
     private $apiKey;
+    private $httpUtil;
 
-    public function __construct($resourceSpaceApi)
+    public function __construct($resourceSpaceApi, $httpUtil)
     {
         $this->apiUrl = $resourceSpaceApi['url'];
         $this->apiUsername = $resourceSpaceApi['username'];
         $this->apiKey = $resourceSpaceApi['key'];
+        $this->httpUtil = $httpUtil;
     }
 
     public function getAllResources($search)
@@ -72,7 +74,7 @@ class ResourceSpace
         $query = 'user=' . str_replace(' ', '+', $this->apiUsername) . '&function=' . $query;
         $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
         echo $url . PHP_EOL;
-        $data = file_get_contents($url);
+        $data = $this->httpUtil->get($url);
         return $data;
     }
 

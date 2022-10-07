@@ -127,7 +127,7 @@ class ProcessCommand extends Command
             }
         }
 
-        $this->resourceSpace = new ResourceSpace($rsConfig['api']);
+        $this->resourceSpace = new ResourceSpace($rsConfig['api'], $httpUtil);
         $allResources = $this->resourceSpace->getAllResources(urlencode($rsConfig['search_query']));
         $this->storeResources($allResources, $rsFields, $rsLinkWithCmsValue, $allowedExtensions, $forbiddenInventoryNumberPrefixes, $forbiddenFilenamePostfixes);
         echo count($this->resourcesByResourceId) . ' resources total for ' . count($this->resourcesByInventoryNumber) . ' unique inventory numbers.' . PHP_EOL;
