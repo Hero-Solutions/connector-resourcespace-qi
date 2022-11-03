@@ -77,7 +77,9 @@ parameters:
       copyrightowner: field99
       credit: field10
       externalnote: field120
-    linkwithcmsvalue: 'Yes'
+    linkwithcmsvalues:
+      - 'Yes'
+      - ',Yes'
     full_data_fields:
       internalnote: field25
     # 'path', 'parent_path', 'key_path' and 'value_path' are JSON path expressions (see https://github.com/Galbar/JsonPath-PHP) used to parse the JSON data from Qi

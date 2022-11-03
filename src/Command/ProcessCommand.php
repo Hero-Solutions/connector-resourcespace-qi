@@ -95,7 +95,10 @@ class ProcessCommand extends Command
 
         $rsConfig = $this->params->get('resourcespace');
         $rsFields = $rsConfig['fields'];
-        $rsLinkWithCmsValue = $rsConfig['linkwithcmsvalue'];
+        $rsLinkWithCmsValues = [];
+        foreach($rsConfig['linkwithcmsvalues'] as $value) {
+            $rsLinkWithCmsValues[$value] = $value;
+        }
         $rsImportMapping = $rsConfig['import_mapping'];
         $rsFullDataFields = $rsConfig['full_data_fields'];
 
@@ -129,7 +132,7 @@ class ProcessCommand extends Command
 
         $this->resourceSpace = new ResourceSpace($rsConfig['api'], $this->httpUtil);
         $allResources = $this->resourceSpace->getAllResources(urlencode($rsConfig['search_query']));
-        $this->storeResources($allResources, $rsFields, $rsLinkWithCmsValue, $allowedExtensions, $forbiddenInventoryNumberPrefixes, $forbiddenFilenamePostfixes);
+        $this->storeResources($allResources, $rsFields, $rsLinkWithCmsValues, $allowedExtensions, $forbiddenInventoryNumberPrefixes, $forbiddenFilenamePostfixes);
         echo count($this->resourcesByResourceId) . ' resources total for ' . count($this->resourcesByInventoryNumber) . ' unique inventory numbers.' . PHP_EOL;
 
         $this->qi = new Qi($qiConfig, $sslCertificateAuthority, $creditConfig, $test, $this->debug, $this->update, $onlyOnlineRecords, $this->httpUtil);
@@ -378,7 +381,7 @@ class ProcessCommand extends Command
         return false;
     }
 
-    private function storeResources($allResources, $rsFields, $rsLinkWithCmsValue,
+    private function storeResources($allResources, $rsFields, $rsLinkWithCmsValues,
                                     $allowedExtensions, $forbiddenInventoryNumberPrefixes, $forbiddenFilenamePostfixes)
     {
         $this->resourcesByResourceId = [];
@@ -387,7 +390,7 @@ class ProcessCommand extends Command
         $tmpResourcesByFilename = [];
         foreach($allResources as $resource) {
             $linkWithCms = $resource[$rsFields['linkwithcms']];
-            if($linkWithCms === $rsLinkWithCmsValue) {
+            if(array_key_exists($linkWithCms, $rsLinkWithCmsValues)) {
                 $rsFilename = $resource[$rsFields['originalfilename']];
                 $extension = strtolower(pathinfo($rsFilename, PATHINFO_EXTENSION));
                 if (in_array($extension, $allowedExtensions)) {
