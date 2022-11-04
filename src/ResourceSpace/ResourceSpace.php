@@ -7,6 +7,7 @@ class ResourceSpace
     private $apiUrl;
     private $apiUsername;
     private $apiKey;
+    private $maxFieldValueLength;
     private $httpUtil;
 
     public function __construct($resourceSpaceApi, $httpUtil)
@@ -14,6 +15,7 @@ class ResourceSpace
         $this->apiUrl = $resourceSpaceApi['url'];
         $this->apiUsername = $resourceSpaceApi['username'];
         $this->apiKey = $resourceSpaceApi['key'];
+        $this->maxFieldValueLength = $resourceSpaceApi['max_field_value_length'];
         $this->httpUtil = $httpUtil;
     }
 
@@ -59,6 +61,9 @@ class ResourceSpace
 
     public function updateField($id, $field, $value, $nodeValue = false)
     {
+        if(strlen($value) > $this->maxFieldValueLength) {
+            $value = substr($value, 0, $this->maxFieldValueLength);
+        }
         $data = $this->doApiCall('update_field&param1=' . $id . '&param2=' . $field . "&param3=" . urlencode($value) . '&param4=' . $nodeValue);
         return json_decode($data, true);
     }

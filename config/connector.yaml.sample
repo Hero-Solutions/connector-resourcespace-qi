@@ -60,6 +60,7 @@ parameters:
       url: ''
       username: ''
       key: ''
+      max_field_value_length: 7500
     search_query: 'publisher:TEST'
     fields:
       linkwithcms: field152
