@@ -42,7 +42,11 @@ class ResourceSpace
     {
         $result = array();
         foreach ($data as $field) {
-            $result[$field['name']] = $field['value'];
+            $value = $field['value'];
+            if(strlen($value) > $this->maxFieldValueLength) {
+                $value = substr($value, 0, $this->maxFieldValueLength);
+            }
+            $result[$field['name']] = $value;
         }
         return $result;
     }
