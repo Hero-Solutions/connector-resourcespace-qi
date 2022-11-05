@@ -101,6 +101,7 @@ class ProcessCommand extends Command
         }
         $rsImportMapping = $rsConfig['import_mapping'];
         $rsFullDataFields = $rsConfig['full_data_fields'];
+        $maxFieldValueLength = $rsConfig['api']['max_field_value_length'];
 
         $qiConfig = $this->params->get('qi');
         $qiUrl = $qiConfig['url'];
@@ -135,7 +136,7 @@ class ProcessCommand extends Command
         $this->storeResources($allResources, $rsFields, $rsLinkWithCmsValues, $allowedExtensions, $forbiddenInventoryNumberPrefixes, $forbiddenFilenamePostfixes);
         echo count($this->resourcesByResourceId) . ' resources total for ' . count($this->resourcesByInventoryNumber) . ' unique inventory numbers.' . PHP_EOL;
 
-        $this->qi = new Qi($qiConfig, $sslCertificateAuthority, $creditConfig, $test, $this->debug, $this->update, $onlyOnlineRecords, $this->httpUtil);
+        $this->qi = new Qi($qiConfig, $sslCertificateAuthority, $creditConfig, $test, $this->debug, $this->update, $onlyOnlineRecords, $this->httpUtil, $maxFieldValueLength);
         $this->qi->retrieveAllObjects();
         $this->objectsByObjectId = $this->qi->getObjectsByObjectId();
         $this->objectsByInventoryNumber = $this->qi->getObjectsByInventoryNumber();

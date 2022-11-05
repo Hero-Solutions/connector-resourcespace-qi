@@ -22,11 +22,12 @@ class Qi
     private $onlyOnlineRecords;
     private $unknownMappings = [];
     private $httpUtil;
+    private $maxFieldValueLength;
 
     private $objectsByObjectId;
     private $objectsByInventoryNumber;
 
-    public function __construct($qi, $sslCertificateAuthority, $creditConfig, $test, $debug, $update, $onlyOnlineRecords, $httpUtil)
+    public function __construct($qi, $sslCertificateAuthority, $creditConfig, $test, $debug, $update, $onlyOnlineRecords, $httpUtil, $maxFieldValueLength)
     {
         $qiApi = $qi['api'];
         $this->baseUrl = $qiApi['url'];
@@ -44,6 +45,7 @@ class Qi
         $this->onlyOnlineRecords = $onlyOnlineRecords;
 
         $this->httpUtil = $httpUtil;
+        $this->maxFieldValueLength = $maxFieldValueLength;
     }
 
     public function getObjectsByObjectId()
@@ -290,6 +292,9 @@ class Qi
                         }
                     }
                     if($res !== null) {
+                        if(strlen($res) > $this->maxFieldValueLength) {
+                            $res = substr($res, 0, $this->maxFieldValueLength);
+                        }
                         $update = true;
                         if(array_key_exists($fieldId, $resource)) {
                             if($resource[$fieldId] === $res || empty($resource[$fieldId]) && empty($res)) {
@@ -324,7 +329,7 @@ class Qi
                                     $nodeValue = true;
                                 }
                             }
-                            if (!$this->test || $resourceId === 149565) {
+                            if (!$this->test) {
                                 $resourceSpace->updateField($resourceId, $fieldName, $res, $nodeValue);
                             }
                         }
