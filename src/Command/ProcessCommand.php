@@ -166,6 +166,7 @@ class ProcessCommand extends Command
                 foreach ($resources as $resourceId => $resource) {
                     // Skip resources that are already linked to an object in Qi
                     if (array_key_exists($resourceId, $this->linkedResources)) {
+                        echo 'Skipping resource ' . $resourceId . 'as it is already linked in Qi.' . PHP_EOL;
                         continue;
                     }
                     $inventoryNumber = $resource[$rsFields['inventorynumber']];
@@ -173,6 +174,7 @@ class ProcessCommand extends Command
                         continue;
                     }
                     if (!array_key_exists($inventoryNumber, $this->objectsByInventoryNumber)) {
+                        echo 'Skipping resource ' . $resourceId . ' as there are no objects with this inventory number.' . PHP_EOL;
                         continue;
                     }
 
@@ -247,6 +249,7 @@ class ProcessCommand extends Command
                     if ($hasMatchingImage) {
                         $this->qi->updateResourceSpaceData($object, $resource, $resourceId, $rsFields, $rsImportMapping, $rsFullDataFields, $qiUrl, $this->resourceSpace);
                     } else if (!$resourceIsLinked && !array_key_exists($object->id, $this->objectIdsUploadedTo)) {
+                        echo 'Checking if resource ' . $resourceId . ' is to be uploaded to object ' . $object->id . ' (inventory number ' . $inventoryNumber . ')' . PHP_EOL;
                         $allImages = $this->resourceSpace->getAllImages($resourceId);
                         foreach ($fileSizes as $fileSize) {
                             $found = false;
@@ -439,11 +442,19 @@ echo 'Resource ' . $resource['ref'] . ' for inventory number ' . $resource[$rsFi
                                     $tmpResourcesByFilename[$inventoryNumber][$ending] = [];
                                 }
                                 $tmpResourcesByFilename[$inventoryNumber][$ending][$resourceId] = $resource;
+                            } else {
+                                echo 'Resource ' . $resource['ref'] . ' has forbidden filename (' . $filenameWithoutExtension . ')' . PHP_EOL;
                             }
+                        } else {
+                            echo 'Resource ' . $resource['ref'] . ' has forbidden inventory number (' . $inventoryNumber . ')' . PHP_EOL;
                         }
+                    } else {
+                        echo 'Resource ' . $resource['ref'] . ' has no inventory number.' . PHP_EOL;
                     }
                 } else if (empty($extension)) {
                     echo 'Resource ' . $resource['ref'] . ' has no extension (' . $rsFilename . ')' . PHP_EOL;
+                } else {
+                    echo 'Resource ' . $resource['ref'] . ' has forbidden extension (' . $rsFilename . ')' . PHP_EOL;
                 }
             }
         }
@@ -451,6 +462,7 @@ echo 'Resource ' . $resource['ref'] . ' for inventory number ' . $resource[$rsFi
             ksort($resourcesByEnding);
             $this->resourcesByFilename[$inventoryNumber] = $resourcesByEnding;
         }
+        var_dump($this->resourcesByFilename);
     }
 
     private function unlinkDeletedMedia($qiLinkDamsPrefix)
