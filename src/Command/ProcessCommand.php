@@ -424,7 +424,7 @@ echo 'Resource ' . $resource['ref'] . ' for inventory number ' . $resource[$rsFi
                                     $this->resourcesByInventoryNumber[$inventoryNumber] = [];
                                 }
                                 $this->resourcesByInventoryNumber[$inventoryNumber][] = $resource;
-#echo 'Resource ' . $resourceId . ' for inventory number ' . $inventoryNumber . PHP_EOL;
+echo 'Check: resource ' . $resourceId . ' for inventory number ' . $inventoryNumber . PHP_EOL;
 
                                 // Sort the resources based on the postfix in their filename (_01, _01_ret, _01_det1, _01_retouche, _02, ..., _M01, _M02, ...)
                                 $ending = "9999999999999999999";
