@@ -395,7 +395,7 @@ class ProcessCommand extends Command
         foreach($allResources as $resource) {
             $linkWithCms = $resource[$rsFields['linkwithcms']];
             if(array_key_exists($linkWithCms, $rsLinkWithCmsValues)) {
-echo 'Resource ' . $resource['ref'] . ' for inventory number ' . $resource[$rsFields['inventorynumber']] . PHP_EOL;
+                echo 'Resource ' . $resource['ref'] . ' for inventory number ' . $resource[$rsFields['inventorynumber']] . PHP_EOL;
                 $rsFilename = $resource[$rsFields['originalfilename']];
                 $extension = strtolower(pathinfo($rsFilename, PATHINFO_EXTENSION));
                 if (in_array($extension, $allowedExtensions)) {
@@ -424,7 +424,6 @@ echo 'Resource ' . $resource['ref'] . ' for inventory number ' . $resource[$rsFi
                                     $this->resourcesByInventoryNumber[$inventoryNumber] = [];
                                 }
                                 $this->resourcesByInventoryNumber[$inventoryNumber][] = $resource;
-echo 'Check: resource ' . $resourceId . ' for inventory number ' . $inventoryNumber . PHP_EOL;
 
                                 // Sort the resources based on the postfix in their filename (_01, _01_ret, _01_det1, _01_retouche, _02, ..., _M01, _M02, ...)
                                 $ending = "9999999999999999999";
@@ -438,7 +437,7 @@ echo 'Check: resource ' . $resourceId . ' for inventory number ' . $inventoryNum
                                 if(!array_key_exists($inventoryNumber, $tmpResourcesByFilename)) {
                                     $tmpResourcesByFilename[$inventoryNumber] = [];
                                 }
-                                if(!array_key_exists($ending, $tmpResourcesByFilename)) {
+                                if(!array_key_exists($ending, $tmpResourcesByFilename[$inventoryNumber])) {
                                     $tmpResourcesByFilename[$inventoryNumber][$ending] = [];
                                 }
                                 $tmpResourcesByFilename[$inventoryNumber][$ending][$resourceId] = $resource;
