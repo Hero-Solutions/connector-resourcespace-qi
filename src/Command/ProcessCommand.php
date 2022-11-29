@@ -205,7 +205,7 @@ class ProcessCommand extends Command
                             if (!$fromRS) {
                                 if ($this->filenamesMatch($resourceId, $rsFilename, $image['filename'])) {
                                     $hasMatchingImage = true;
-                                    echo 'Found matching image ' . $resourceId . ' for object' . $object->id . ' (inv ' . $inventoryNumber . ')' . PHP_EOL;
+                                    echo 'Found matching image ' . $resourceId . ' for object ' . $object->id . ' (inv ' . $inventoryNumber . ')' . PHP_EOL;
                                     if($this->update) {
                                         $this->qi->updateMetadata($image, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true, $this->qiReindexUrl . $object->id);
 
@@ -242,6 +242,7 @@ class ProcessCommand extends Command
                                         }
                                     }
                                     $this->importedResources[$resourceId] = $resourceObject;
+                                    $resourceIsLinked = true;
                                 }
                             }
                         }
