@@ -159,8 +159,6 @@ class ProcessCommand extends Command
         // Update Qi image metadata with metadata from Qi objects
         $this->updateQiSelfMetadata($qiMappingToSelf);
 
-        $uploaded = 0;
-
         foreach ($this->resourcesByFilename as $inventoryNumber => $resourcesByEnding) {
             foreach($resourcesByEnding as $ending => $resources) {
                 foreach ($resources as $resourceId => $resource) {
@@ -529,9 +527,6 @@ class ProcessCommand extends Command
                     echo 'ERROR: No match found for resource ' . $ir->getResourceId() . ' with object ' . $ir->getObjectId() . ' (inventory number ' . $ir->getInventoryNumber() . ')' . PHP_EOL;
                 }
             }
-        }
-        if($i > 0) {
-            $this->entityManager->flush();
         }
     }
 
