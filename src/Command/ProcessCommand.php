@@ -236,10 +236,7 @@ class ProcessCommand extends Command
                                         }
                                         $resourceObject->setLinked(2);
                                         $this->entityManager->persist($resourceObject);
-                                        $uploaded++;
-                                        if ($uploaded % 100 === 0) {
-                                            $this->entityManager->flush();
-                                        }
+                                        $this->entityManager->flush();
                                     }
                                     $this->importedResources[$resourceId] = $resourceObject;
                                     $resourceIsLinked = true;
@@ -285,10 +282,7 @@ class ProcessCommand extends Command
                                         $resourceObject->setLinked(0);
                                         $this->entityManager->persist($resourceObject);
                                         $this->importedResources[$resourceId] = $resourceObject;
-                                        $uploaded++;
-                                        if ($uploaded % 100 === 0) {
-                                            $this->entityManager->flush();
-                                        }
+                                        $this->entityManager->flush();
                                     }
                                     break;
                                 }
@@ -300,9 +294,6 @@ class ProcessCommand extends Command
                     }
                 }
             }
-        }
-        if($uploaded > 0) {
-            $this->entityManager->flush();
         }
     }
 
@@ -462,12 +453,10 @@ class ProcessCommand extends Command
             ksort($resourcesByEnding);
             $this->resourcesByFilename[$inventoryNumber] = $resourcesByEnding;
         }
-        var_dump($this->resourcesByFilename);
     }
 
     private function unlinkDeletedMedia($qiLinkDamsPrefix)
     {
-        $i = 0;
         foreach($this->importedResources as $resourceId => $ir) {
             if($ir->getLinked() > 0) {
                 if(array_key_exists($ir->getObjectId(), $this->objectsByObjectId) && array_key_exists($ir->getInventoryNumber(), $this->objectsByInventoryNumber)) {
@@ -497,25 +486,19 @@ class ProcessCommand extends Command
                                 $unlinkedResource->setFilesize($ir->getFilesize());
                                 $unlinkedResource->setLinked($ir->getLinked());
                                 $this->entityManager->persist($unlinkedResource);
+                                $this->entityManager->flush();
                                 $this->entityManager->remove($ir);
-                                $i++;
-                                if($i % 50 === 0) {
-                                    $this->entityManager->flush();
-                                }
+                                $this->entityManager->flush();
                             }
                         }
                     }
                 }
             }
         }
-        if($i > 0) {
-            $this->entityManager->flush();
-        }
     }
 
     private function linkImportedResources($rsFields, $qiImportMapping, $qiMediaFolderId, $qiLinkDamsPrefix)
     {
-        $i = 0;
         foreach($this->importedResources as $ir) {
             if($ir->getLinked() === 0) {
                 if(array_key_exists($ir->getResourceId(), $this->resourcesByResourceId) && array_key_exists($ir->getInventoryNumber(), $this->resourcesByInventoryNumber)
@@ -530,10 +513,7 @@ class ProcessCommand extends Command
                                 $this->qi->updateMetadata($qiImage, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true, $this->qiReindexUrl . $ir->getObjectId());
                                 $ir->setLinked(1);
                                 $this->entityManager->persist($ir);
-                                $i++;
-                                if ($i % 100 === 0) {
-                                    $this->entityManager->flush();
-                                }
+                                $this->entityManager->flush();
                             }
                             $this->linkedResources[$ir->getResourceId()] = $ir->getResourceId();
                         } else {

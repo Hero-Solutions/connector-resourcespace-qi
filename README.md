@@ -12,8 +12,7 @@ CREATE TABLE `resource` (
     `width` INT UNSIGNED NOT NULL DEFAULT 0,
     `height` INT UNSIGNED NOT NULL DEFAULT 0,
     `filesize` INT UNSIGNED NOT NULL DEFAULT 0,
-    `linked` TINYINT UNSIGNED NOT NULL DEFAULT 0,
-    PRIMARY KEY(resource_id, object_id)
+    `linked` TINYINT UNSIGNED NOT NULL DEFAULT 0
 );
 CREATE TABLE `unlinked_resource` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
