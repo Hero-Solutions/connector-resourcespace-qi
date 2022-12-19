@@ -468,28 +468,33 @@ class ProcessCommand extends Command
                             }
                         }
                         if(!$linked) {
-                            echo 'Unlink resource ' . $ir->getResourceId() . ' from object ' . $ir->getObjectId() . ' (inv. ' . $ir->getInventoryNumber() . ')' . PHP_EOL;
-                            unset($this->importedResources[$resourceId]);
-                            if($this->update) {
-                                $unlinkedResource = new UnlinkedResource();
-                                $unlinkedResource->setImportTimestamp($ir->getImportTimestamp());
-                                $unlinkedResource->setResourceId($ir->getResourceId());
-                                $unlinkedResource->setObjectId($ir->getObjectId());
-                                $unlinkedResource->setInventoryNumber($ir->getInventoryNumber());
-                                $unlinkedResource->setOriginalFilename($ir->getOriginalFilename());
-                                $unlinkedResource->setWidth($ir->getWidth());
-                                $unlinkedResource->setHeight($ir->getHeight());
-                                $unlinkedResource->setFilesize($ir->getFilesize());
-                                $unlinkedResource->setLinked($ir->getLinked());
-                                $this->entityManager->persist($unlinkedResource);
-                                $this->entityManager->flush();
-                                $this->entityManager->remove($ir);
-                                $this->entityManager->flush();
-                            }
+                            $this->unlinkResource($ir);
                         }
                     }
                 }
             }
+        }
+    }
+
+    private function unlinkResource($ir)
+    {
+        echo 'Unlink resource ' . $ir->getResourceId() . ' from object ' . $ir->getObjectId() . ' (inv. ' . $ir->getInventoryNumber() . ')' . PHP_EOL;
+        unset($this->importedResources[$ir->getResourceId()]);
+        if($this->update) {
+            $unlinkedResource = new UnlinkedResource();
+            $unlinkedResource->setImportTimestamp($ir->getImportTimestamp());
+            $unlinkedResource->setResourceId($ir->getResourceId());
+            $unlinkedResource->setObjectId($ir->getObjectId());
+            $unlinkedResource->setInventoryNumber($ir->getInventoryNumber());
+            $unlinkedResource->setOriginalFilename($ir->getOriginalFilename());
+            $unlinkedResource->setWidth($ir->getWidth());
+            $unlinkedResource->setHeight($ir->getHeight());
+            $unlinkedResource->setFilesize($ir->getFilesize());
+            $unlinkedResource->setLinked($ir->getLinked());
+            $this->entityManager->persist($unlinkedResource);
+            $this->entityManager->flush();
+            $this->entityManager->remove($ir);
+            $this->entityManager->flush();
         }
     }
 
@@ -518,7 +523,8 @@ class ProcessCommand extends Command
                         }
                     } else {
                         $this->objectIdsUploadedTo[$ir->getObjectId()] = $ir->getObjectId();
-                        echo 'ERROR: Mismatch for resource ' . $ir->getResourceId() . ' with object ' . $ir->getObjectId() . ' (inventory number ' . $ir->getInventoryNumber() . ')' . PHP_EOL;
+                        echo 'ERROR: Mismatch for resource ' . $ir->getResourceId() . ' with object ' . $ir->getObjectId() . ' (inventory number ' . $ir->getInventoryNumber() . '), deleting.' . PHP_EOL;
+                        $this->unlinkResource($ir);
                     }
                 } else {
                     $this->objectIdsUploadedTo[$ir->getObjectId()] = $ir->getObjectId();

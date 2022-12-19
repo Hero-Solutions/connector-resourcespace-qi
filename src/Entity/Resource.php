@@ -55,6 +55,9 @@ class Resource
 
     /**
      * @ORM\Column(type="integer")
+     * 0 = uploaded but not yet linked
+     * 1 = uploaded and linked
+     * 2 = existing image linked
      */
     private $linked;
 
