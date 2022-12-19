@@ -182,9 +182,7 @@ class ProcessCommand extends Command
 
                     $resourceIsLinked = false;
                     if (array_key_exists($resourceId, $this->importedResources)) {
-                        if ($this->importedResources[$resourceId]->getObjectId() === intval($object->id)) {
-                            $resourceIsLinked = true;
-                        }
+                        $resourceIsLinked = true;
                     }
 
                     foreach ($this->qiImages[$object->id] as $image) {
