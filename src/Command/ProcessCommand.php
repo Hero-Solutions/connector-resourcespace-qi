@@ -455,21 +455,19 @@ class ProcessCommand extends Command
     {
         foreach($this->importedResources as $resourceId => $ir) {
             if($ir->getLinked() > 0) {
-                if(array_key_exists($ir->getObjectId(), $this->objectsByObjectId) && array_key_exists($ir->getInventoryNumber(), $this->objectsByInventoryNumber)) {
-                    if($this->objectsByObjectId[$ir->getObjectId()] === $this->objectsByInventoryNumber[$ir->getInventoryNumber()]) {
-                        $linked = false;
-                        $images = $this->qiImages[$ir->getObjectId()];
-                        foreach($images as $image) {
-                            if (array_key_exists('link_dams', $image)) {
-                                if($image['link_dams'] === $qiLinkDamsPrefix . $ir->getResourceId()) {
-                                    $linked = true;
-                                    break;
-                                }
+                if(array_key_exists($ir->getObjectId(), $this->objectsByObjectId)) {
+                    $linked = false;
+                    $images = $this->qiImages[$ir->getObjectId()];
+                    foreach($images as $image) {
+                        if (array_key_exists('link_dams', $image)) {
+                            if($image['link_dams'] === $qiLinkDamsPrefix . $ir->getResourceId()) {
+                                $linked = true;
+                                break;
                             }
                         }
-                        if(!$linked) {
-                            $this->unlinkResource($ir);
-                        }
+                    }
+                    if(!$linked) {
+                        $this->unlinkResource($ir);
                     }
                 }
             }
@@ -502,31 +500,26 @@ class ProcessCommand extends Command
     {
         foreach($this->importedResources as $ir) {
             if($ir->getLinked() === 0) {
-                if(array_key_exists($ir->getResourceId(), $this->resourcesByResourceId) && array_key_exists($ir->getInventoryNumber(), $this->resourcesByInventoryNumber)
-                    && array_key_exists($ir->getObjectId(), $this->objectsByObjectId) && array_key_exists($ir->getInventoryNumber(), $this->objectsByInventoryNumber)) {
-                    if(in_array($this->resourcesByResourceId[$ir->getResourceId()], $this->resourcesByInventoryNumber[$ir->getInventoryNumber()])
-                        && $this->objectsByObjectId[$ir->getObjectId()] === $this->objectsByInventoryNumber[$ir->getInventoryNumber()]) {
-                        $images = $this->qiImages[$ir->getObjectId()];
-                        $resource = $this->resourcesByResourceId[$ir->getResourceId()];
-                        $qiImage = $this->qi->getMatchingImageToBeLinked($images, $ir->getOriginalFilename(), $ir->getWidth(), $ir->getHeight(), $ir->getFilesize(), $qiMediaFolderId);
-                        if ($qiImage !== null) {
-                            if($this->update) {
-                                $this->qi->updateMetadata($qiImage, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true, $this->qiReindexUrl . $ir->getObjectId());
-                                $ir->setLinked(1);
-                                $this->entityManager->persist($ir);
-                                $this->entityManager->flush();
-                            }
-                            $this->linkedResources[$ir->getResourceId()] = $ir->getResourceId();
-                        } else {
-                            $this->objectIdsUploadedTo[$ir->getObjectId()] = $ir->getObjectId();
-                            echo 'ERROR: No matching image found for resource ' . $ir->getResourceId() . ' with object ' . $ir->getObjectId() . ' (inventory number ' . $ir->getInventoryNumber() . ')' . PHP_EOL;
+                $this->objectIdsUploadedTo[$ir->getObjectId()] = $ir->getObjectId();
+                if(array_key_exists($ir->getResourceId(), $this->resourcesByResourceId) && array_key_exists($ir->getObjectId(), $this->objectsByObjectId)) {
+                    $images = $this->qiImages[$ir->getObjectId()];
+                    $resource = $this->resourcesByResourceId[$ir->getResourceId()];
+                    $qiImage = $this->qi->getMatchingImageToBeLinked($images, $ir->getOriginalFilename(), $ir->getWidth(), $ir->getHeight(), $ir->getFilesize(), $qiMediaFolderId);
+                    if ($qiImage !== null) {
+                        if($this->update) {
+                            $this->qi->updateMetadata($qiImage, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true, $this->qiReindexUrl . $ir->getObjectId());
+                            $ir->setLinked(1);
+                            $this->entityManager->persist($ir);
+                            $this->entityManager->flush();
                         }
+                        $this->linkedResources[$ir->getResourceId()] = $ir->getResourceId();
                     } else {
+                        //Something went wrong, prevent images to be uploaded to this object during this run
                         $this->objectIdsUploadedTo[$ir->getObjectId()] = $ir->getObjectId();
-                        echo 'ERROR: Mismatch for resource ' . $ir->getResourceId() . ' with object ' . $ir->getObjectId() . ' (inventory number ' . $ir->getInventoryNumber() . '), deleting.' . PHP_EOL;
-                        $this->unlinkResource($ir);
+                        echo 'ERROR: No matching image found for resource ' . $ir->getResourceId() . ' with object ' . $ir->getObjectId() . ' (inventory number ' . $ir->getInventoryNumber() . ')' . PHP_EOL;
                     }
                 } else {
+                    //Something went wrong, prevent images to be uploaded to this object during this run
                     $this->objectIdsUploadedTo[$ir->getObjectId()] = $ir->getObjectId();
                     echo 'ERROR: No match found for resource ' . $ir->getResourceId() . ' with object ' . $ir->getObjectId() . ' (inventory number ' . $ir->getInventoryNumber() . ')' . PHP_EOL;
                 }
