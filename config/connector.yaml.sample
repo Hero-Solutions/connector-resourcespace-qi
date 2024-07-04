@@ -16,6 +16,9 @@ parameters:
     - tiff
     - tif
 
+  allowed_filetypes:
+    - TIFF
+
   file_sizes:
     - lpr
     - scr
@@ -66,6 +69,7 @@ parameters:
       linkwithcms: field152
       linkcms: field150
       originalfilename: field51
+      filetype: field84
       inventorynumber: field105
       title: field8
       description: field91

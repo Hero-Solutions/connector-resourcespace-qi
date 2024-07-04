@@ -88,6 +88,7 @@ class ProcessCommand extends Command
         }
 
         $allowedExtensions = $this->params->get('allowed_extensions');
+        $allowedFiletypes = $this->params->get('allowed_filetypes');
         $fileSizes = $this->params->get('file_sizes');
         $forbiddenInventoryNumberPrefixes = $this->params->get('forbidden_inventory_number_prefixes');
         $forbiddenFilenamePostfixes = $this->params->get('forbidden_filename_postfixes');
@@ -133,7 +134,7 @@ class ProcessCommand extends Command
 
         $this->resourceSpace = new ResourceSpace($rsConfig['api'], $this->httpUtil);
         $allResources = $this->resourceSpace->getAllResources(urlencode($rsConfig['search_query']));
-        $this->storeResources($allResources, $rsFields, $rsLinkWithCmsValues, $allowedExtensions, $forbiddenInventoryNumberPrefixes, $forbiddenFilenamePostfixes);
+        $this->storeResources($allResources, $rsFields, $rsLinkWithCmsValues, $allowedExtensions, $allowedFiletypes, $forbiddenInventoryNumberPrefixes, $forbiddenFilenamePostfixes);
         echo count($this->resourcesByResourceId) . ' resources total for ' . count($this->resourcesByInventoryNumber) . ' unique inventory numbers.' . PHP_EOL;
 
         $this->qi = new Qi($qiConfig, $sslCertificateAuthority, $creditConfig, $test, $this->debug, $this->update, $onlyOnlineRecords, $this->httpUtil, $maxFieldValueLength);
@@ -374,7 +375,7 @@ class ProcessCommand extends Command
     }
 
     private function storeResources($allResources, $rsFields, $rsLinkWithCmsValues,
-                                    $allowedExtensions, $forbiddenInventoryNumberPrefixes, $forbiddenFilenamePostfixes)
+                                    $allowedExtensions, $allowedFiletypes, $forbiddenInventoryNumberPrefixes, $forbiddenFilenamePostfixes)
     {
         $this->resourcesByResourceId = [];
         $this->resourcesByInventoryNumber = [];
@@ -386,7 +387,8 @@ class ProcessCommand extends Command
                 echo 'Resource ' . $resource['ref'] . ' for inventory number ' . $resource[$rsFields['inventorynumber']] . PHP_EOL;
                 $rsFilename = $resource[$rsFields['originalfilename']];
                 $extension = strtolower(pathinfo($rsFilename, PATHINFO_EXTENSION));
-                if (in_array($extension, $allowedExtensions)) {
+                $filetype = $resource[$rsFields['filetype']];
+                if (in_array($extension, $allowedExtensions) || in_array($filetype, $allowedFiletypes)) {
                     $inventoryNumber = $resource[$rsFields['inventorynumber']];
                     if (!empty($inventoryNumber)) {
                         $forbiddenInventoryNumber = false;
