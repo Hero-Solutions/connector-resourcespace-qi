@@ -387,7 +387,11 @@ class ProcessCommand extends Command
                 echo 'Resource ' . $resource['ref'] . ' for inventory number ' . $resource[$rsFields['inventorynumber']] . PHP_EOL;
                 $rsFilename = $resource[$rsFields['originalfilename']];
                 $extension = strtolower(pathinfo($rsFilename, PATHINFO_EXTENSION));
-                $filetype = $resource[$rsFields['filetype']];
+
+                $filetype = '';
+                if(array_key_exists($rsFields['filetype'], $resource)) {
+                    $filetype = $resource[$rsFields['filetype']];
+                }
                 if (in_array($extension, $allowedExtensions) || in_array($filetype, $allowedFiletypes)) {
                     $inventoryNumber = $resource[$rsFields['inventorynumber']];
                     if (!empty($inventoryNumber)) {
