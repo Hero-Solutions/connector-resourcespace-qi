@@ -63,11 +63,13 @@ class Qi
         $this->objectsByObjectId = [];
         $this->objectsByInventoryNumber = [];
 
+        //Get all records of up to 1 year ago
+        $time = strtotime("-1 year", time());
+        $date = date("Y-m-d", $time);
+
         if($this->test) {
             $objsJson = $this->get($this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields) . '/_offset/12929');
         } else {
-            $time = strtotime("-1 year", time());
-            $date = date("Y-m-d", $time);
             $objsJson = $this->get($this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields) . '/_since/' . $date);
         }
 
@@ -85,7 +87,7 @@ class Qi
             }
         }
         for($i = 1; !$this->test && $i <= intval(($count + 499) / 500) - 1; $i++) {
-            $objsJson = $this->get($this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields) . '/_offset/' . ($i * 500));
+            $objsJson = $this->get($this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields) . '/_since/' . $date . '_offset/' . ($i * 500));
             $objs = json_decode($objsJson);
             $records = $objs->records;
             foreach($records as $record) {
