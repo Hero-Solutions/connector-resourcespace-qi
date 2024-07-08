@@ -69,6 +69,7 @@ parameters:
       linkwithcms: field152
       linkcms: field150
       originalfilename: field51
+      fileextension: file_extension
       filetype: field84
       inventorynumber: field105
       title: field8

@@ -388,11 +388,17 @@ class ProcessCommand extends Command
                 $rsFilename = $resource[$rsFields['originalfilename']];
                 $extension = strtolower(pathinfo($rsFilename, PATHINFO_EXTENSION));
 
+                $fileExtension = '';
+                if(array_key_exists($rsFields['fileextension'], $resource)) {
+                    $fileExtension = $resource[$rsFields['fileextension']];
+                }
+
                 $filetype = '';
                 if(array_key_exists($rsFields['filetype'], $resource)) {
                     $filetype = $resource[$rsFields['filetype']];
                 }
-                if (in_array($extension, $allowedExtensions) || in_array($filetype, $allowedFiletypes)) {
+
+                if (in_array($extension, $allowedExtensions) || in_array($fileExtension, $allowedExtensions) || in_array($filetype, $allowedFiletypes)) {
                     $inventoryNumber = $resource[$rsFields['inventorynumber']];
                     if (!empty($inventoryNumber)) {
                         $forbiddenInventoryNumber = false;
