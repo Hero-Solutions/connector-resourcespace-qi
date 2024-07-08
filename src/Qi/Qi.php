@@ -67,7 +67,7 @@ class Qi
             $objsJson = $this->get($this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields) . '/_offset/12929');
         } else {
             $time = strtotime("-1 year", time());
-            $date = date("Y/m/d", $time);
+            $date = date("Y-m-d", $time);
             $objsJson = $this->get($this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields) . '/_since/' . $date);
         }
 
