@@ -58,13 +58,13 @@ class Qi
         return $this->objectsByInventoryNumber;
     }
 
-    public function retrieveAllObjects()
+    public function retrieveAllObjects($recordsUpdatedSince)
     {
         $this->objectsByObjectId = [];
         $this->objectsByInventoryNumber = [];
 
-        //Get all records of up to 1 year ago
-        $time = strtotime("-1 year", time());
+        //Get all records of up to 1 week ago
+        $time = strtotime('-' . $recordsUpdatedSince, time());
         $date = date("Y-m-d", $time);
 
         if($this->test) {

@@ -77,6 +77,7 @@ class ProcessCommand extends Command
         $ftpUser = $this->params->get('ftp_user');
         $ftpGroup = $this->params->get('ftp_group');
         $onlyOnlineRecords = $this->params->get('only_online_records');
+        $recordsUpdatedSince = $this->params->get('records_updated_since');
 
         // Abort the run if the ftp folder exists and is not empty
         if(is_dir($ftpFolder)) {
@@ -138,7 +139,7 @@ class ProcessCommand extends Command
         echo count($this->resourcesByResourceId) . ' resources total for ' . count($this->resourcesByInventoryNumber) . ' unique inventory numbers.' . PHP_EOL;
 
         $this->qi = new Qi($qiConfig, $sslCertificateAuthority, $creditConfig, $test, $this->debug, $this->update, $onlyOnlineRecords, $this->httpUtil, $maxFieldValueLength);
-        $this->qi->retrieveAllObjects();
+        $this->qi->retrieveAllObjects($recordsUpdatedSince);
         $this->objectsByObjectId = $this->qi->getObjectsByObjectId();
         $this->objectsByInventoryNumber = $this->qi->getObjectsByInventoryNumber();
         echo count($this->objectsByInventoryNumber) . ' Qi objects with inventory number (' . count($this->objectsByObjectId) . ' total).' . PHP_EOL;

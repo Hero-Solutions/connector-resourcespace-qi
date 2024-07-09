@@ -7,6 +7,7 @@ parameters:
   ftp_user: ''
   ftp_group: ''
   only_online_records: true
+  records_updated_since: '1 week'
 
   allowed_extensions:
     - gif
