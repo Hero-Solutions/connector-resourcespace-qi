@@ -2,13 +2,19 @@
 
 namespace App\Qi;
 
+use App\Entity\QiObject;
 use App\Entity\Resource;
 use App\ResourceSpace\ResourceSpace;
+use DateTime;
+use Doctrine\ORM\EntityManager;
 use JsonPath\InvalidJsonException;
 use JsonPath\JsonObject;
 
 class Qi
 {
+    /** @var $entityManager EntityManager */
+    private $entityManager;
+
     private $baseUrl;
     private $username;
     private $password;
@@ -19,6 +25,7 @@ class Qi
     private $test;
     private $debug;
     private $update;
+    private $fullProcessing;
     private $onlyOnlineRecords;
     private $unknownMappings = [];
     private $httpUtil;
@@ -27,8 +34,10 @@ class Qi
     private $objectsByObjectId;
     private $objectsByInventoryNumber;
 
-    public function __construct($qi, $sslCertificateAuthority, $creditConfig, $test, $debug, $update, $onlyOnlineRecords, $httpUtil, $maxFieldValueLength)
+    public function __construct($entityManager, $qi, $sslCertificateAuthority, $creditConfig, $test, $debug, $update, $fullProcessing, $onlyOnlineRecords, $httpUtil, $maxFieldValueLength)
     {
+        $this->entityManager = $entityManager;
+
         $qiApi = $qi['api'];
         $this->baseUrl = $qiApi['url'];
         $this->username = $qiApi['username'];
@@ -42,6 +51,7 @@ class Qi
         $this->test = $test;
         $this->debug = $debug;
         $this->update = $update;
+        $this->fullProcessing = $fullProcessing;
         $this->onlyOnlineRecords = $onlyOnlineRecords;
 
         $this->httpUtil = $httpUtil;
@@ -63,6 +73,25 @@ class Qi
         $this->objectsByObjectId = [];
         $this->objectsByInventoryNumber = [];
 
+        if($this->fullProcessing) {
+            //Clear all cached Qi object data from MySQL
+            $this->entityManager->createQueryBuilder()
+                ->delete(QiObject::class, 'q')
+                ->getQuery()
+                ->execute();
+        } else {
+            //Retrieve alle cached Qi object data from MySQL
+            /* @var $qiObjects QiObject[] */
+            $qiObjects = $this->entityManager->createQueryBuilder()
+                ->select('q')
+                ->from(QiObject::class, 'q')
+                ->getQuery()
+                ->getResult();
+            foreach($qiObjects as $qiObject) {
+                $this->extractRecord(json_decode($qiObject->getMetadata()));
+            }
+        }
+
         //Get all records of up to 1 week ago
         $time = strtotime('-' . $recordsUpdatedSince, time());
         $date = date("Y-m-d", $time);
@@ -70,36 +99,83 @@ class Qi
         if($this->test) {
             $objsJson = $this->get($this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields) . '/_offset/12929');
         } else {
-            $objsJson = $this->get($this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields) . '/_since/' . $date);
+            if($this->fullProcessing) {
+                $objsJson = $this->get($this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields));
+            } else {
+                $objsJson = $this->get($this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields) . '/_since/' . $date);
+            }
         }
 
-        $objs = json_decode($objsJson);
-        $count = $objs->count;
-        $records = $objs->records;
-        foreach($records as $record) {
-            if(!$this->onlyOnlineRecords || $record->online === '1') {
-                $this->objectsByObjectId[intval($record->id)] = $record;
-                if(!empty($record->object_number)) {
-                    $this->objectsByInventoryNumber[$record->object_number] = $record;
+        $count = $this->storeObjects($objsJson);
+
+        for($i = 1; !$this->test && $i <= intval(($count + 499) / 500) - 1; $i++) {
+            echo 'Sleeping' . PHP_EOL;
+            sleep(300);
+            $tries = 0;
+            while($tries < 10) {
+                if($this->fullProcessing) {
+                    $objsJson = $this->get($this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields) . '/_offset/' . ($i * 500));
                 } else {
-                    echo 'Error: Qi record ' . $record->id . ' has no inventory number' . PHP_EOL;
+                    $objsJson = $this->get($this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields) . '/_since/' . $date . '/_offset/' . ($i * 500));
                 }
+                if($objsJson === false) {
+                    $tries++;
+                    echo 'Sleeping' . PHP_EOL;
+                    sleep(300);
+                } else {
+                    $tries = 10;
+                }
+            }
+
+            $this->storeObjects($objsJson);
+        }
+
+        if(!$this->fullProcessing) {
+            //Retrieve all objects from Qi where resources were recently added or unlinked
+            $oneMonthAgo = new DateTime('-1 month');
+            /* @var $importedResourcesObjects Resource[] */
+            $importedResourcesObjects = $this->entityManager->createQueryBuilder()
+                ->select('r')
+                ->from(Resource::class, 'r')
+                ->where('r.importTimestamp > :oneMonthAgo')
+                ->setParameter('oneMonthAgo', $oneMonthAgo)
+                ->getQuery()
+                ->getResult();
+            foreach($importedResourcesObjects as $importedResource) {
+                $objsJson = $this->get($this->baseUrl . '/get/object/id/' . $importedResource->getObjectId() . '/_fields/' . urlencode($this->getFields));
+                $this->storeObjects($objsJson);
             }
         }
-        for($i = 1; !$this->test && $i <= intval(($count + 499) / 500) - 1; $i++) {
-            $objsJson = $this->get($this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields) . '/_since/' . $date . '/_offset/' . ($i * 500));
-            $objs = json_decode($objsJson);
-            $records = $objs->records;
-            foreach($records as $record) {
-                if(!$this->onlyOnlineRecords || $record->online === '1') {
-                    $this->objectsByObjectId[intval($record->id)] = $record;
-                    if(!empty($record->object_number)) {
-                        $this->objectsByInventoryNumber[$record->object_number] = $record;
-                    } else {
-                        echo 'Error: Qi record ' . $record->id . ' has no inventory number' . PHP_EOL;
-                    }
-                }
+    }
+
+    private function storeObjects($objsJson)
+    {
+        $objs = json_decode($objsJson);
+        $records = $objs->records;
+        $count = $objs->count;
+        foreach($records as $record) {
+            $this->extractRecord($record);
+        }
+        return $count;
+    }
+
+    private function extractRecord($record)
+    {
+        if(!$this->onlyOnlineRecords || $record->online === '1') {
+            $this->objectsByObjectId[intval($record->id)] = $record;
+            if(!empty($record->object_number)) {
+                $this->objectsByInventoryNumber[$record->object_number] = $record;
+            } else {
+                echo 'Error: Qi record ' . $record->id . ' has no inventory number' . PHP_EOL;
             }
+        }
+        if($this->fullProcessing) {
+            //Store in MySQL for faster processing in the next cycles
+            $qiObject = new QiObject();
+            $qiObject->setObjectId(intval($record->id));
+            $qiObject->setMetadata(json_encode($record));
+            $this->entityManager->persist($qiObject);
+            $this->entityManager->flush();
         }
     }
 
@@ -676,6 +752,8 @@ class Qi
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
         curl_setopt($ch, CURLOPT_USERPWD, $this->username . ':' . $this->password);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 300);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 300);
 
         $resultJson = curl_exec($ch);
         if($resultJson === false) {
@@ -686,6 +764,7 @@ class Qi
                     break;
                 default:
                     echo 'HTTP error ' .  $http_code . ': ' . $resultJson . PHP_EOL;
+                    $resultJson = false;
                     break;
             }
         }

@@ -29,6 +29,8 @@ class ProcessCommand extends Command
     private $qi;
 
     private $debug;
+    private $verbose;
+    private $fullProcessing;
 
     private $resourcesByResourceId;
     private $resourcesByInventoryNumber;
@@ -48,6 +50,7 @@ class ProcessCommand extends Command
     {
         $this
             ->setName('app:process')
+            ->addOption('full-processing', null, InputOption::VALUE_NONE, 'Perform full processing, loading all Qi objects instead of only the recent ones.')
             ->setDescription('Links ResourceSpace resources to Qi objects, offloads resources where needed and exchanges metadata between both systems.');
     }
 
@@ -61,6 +64,7 @@ class ProcessCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $this->verbose = $input->getOption('verbose');
+        $this->fullProcessing = $input->getOption('full-processing');
         $this->process();
         return 0;
     }
@@ -117,10 +121,15 @@ class ProcessCommand extends Command
 
         $this->httpUtil = new HttpUtil($sslCertificateAuthority, $this->debug);
 
+        //Do not reindex orphaned resources that never managed to get linked when they are older than 1 month
+        $oneMonthAgo = new DateTime('-1 month');
+
         /* @var $importedResourcesObjects Resource[] */
         $importedResourcesObjects = $this->entityManager->createQueryBuilder()
             ->select('r')
             ->from(Resource::class, 'r')
+            ->where('r.importTimestamp > :oneMonthAgo')
+            ->setParameter('oneMonthAgo', $oneMonthAgo)
             ->getQuery()
             ->getResult();
         $this->importedResources = [];
@@ -138,7 +147,7 @@ class ProcessCommand extends Command
         $this->storeResources($allResources, $rsFields, $rsLinkWithCmsValues, $allowedExtensions, $allowedFiletypes, $forbiddenInventoryNumberPrefixes, $forbiddenFilenamePostfixes);
         echo count($this->resourcesByResourceId) . ' resources total for ' . count($this->resourcesByInventoryNumber) . ' unique inventory numbers.' . PHP_EOL;
 
-        $this->qi = new Qi($qiConfig, $sslCertificateAuthority, $creditConfig, $test, $this->debug, $this->update, $onlyOnlineRecords, $this->httpUtil, $maxFieldValueLength);
+        $this->qi = new Qi($this->entityManager, $qiConfig, $sslCertificateAuthority, $creditConfig, $test, $this->debug, $this->update, $this->fullProcessing, $onlyOnlineRecords, $this->httpUtil, $maxFieldValueLength);
         $this->qi->retrieveAllObjects($recordsUpdatedSince);
         $this->objectsByObjectId = $this->qi->getObjectsByObjectId();
         $this->objectsByInventoryNumber = $this->qi->getObjectsByInventoryNumber();
