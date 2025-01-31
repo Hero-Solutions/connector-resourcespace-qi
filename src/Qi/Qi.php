@@ -131,6 +131,9 @@ class Qi
         }
 
         if(!$this->fullProcessing) {
+
+            $this->ping();
+
             //Retrieve all objects from Qi where resources were recently added or unlinked
             $oneMonthAgo = new DateTime('-1 month');
             /* @var $importedResourcesObjects Resource[] */
@@ -170,12 +173,22 @@ class Qi
             }
         }
         if($this->fullProcessing) {
+            $this->ping();
+
             //Store in MySQL for faster processing in the next cycles
             $qiObject = new QiObject();
             $qiObject->setObjectId(intval($record->id));
             $qiObject->setMetadata(json_encode($record));
             $this->entityManager->persist($qiObject);
             $this->entityManager->flush();
+        }
+    }
+
+    private function ping()
+    {
+        $connection = $this->entityManager->getConnection();
+        if (!$connection->isConnected()) {
+            $connection->connect();
         }
     }
 
