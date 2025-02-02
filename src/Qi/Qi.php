@@ -176,8 +176,12 @@ class Qi
             $this->ping();
 
             //Store in MySQL for faster processing in the next cycles
-            $qiObject = new QiObject();
-            $qiObject->setObjectId(intval($record->id));
+            //First, find if an object with this ID already exists
+            $qiObject = $this->entityManager->getRepository(QiObject::class)->find(intval($record->id));
+            if (!$qiObject) {
+                $qiObject = new QiObject();
+                $qiObject->setObjectId(intval($record->id));
+            }
             $qiObject->setMetadata(json_encode($record));
             $this->entityManager->persist($qiObject);
             $this->entityManager->flush();
