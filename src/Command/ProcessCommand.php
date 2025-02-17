@@ -123,14 +123,15 @@ class ProcessCommand extends Command
         $this->httpUtil = new HttpUtil($sslCertificateAuthority, $this->debug);
 
         //Do not reindex orphaned resources that never managed to get linked when they are older than 1 month
-        $oneMonthAgo = new DateTime('-1 month');
+        //TODO rethink this approach, because when these older linked and orphaned resources are being manually removed from objects, the object gets bugged
+//        $oneMonthAgo = new DateTime('-1 month');
 
         /* @var $importedResourcesObjects Resource[] */
         $importedResourcesObjects = $this->entityManager->createQueryBuilder()
             ->select('r')
             ->from(Resource::class, 'r')
-            ->where('r.importTimestamp > :oneMonthAgo')
-            ->setParameter('oneMonthAgo', $oneMonthAgo)
+//            ->where('r.importTimestamp > :oneMonthAgo')
+//            ->setParameter('oneMonthAgo', $oneMonthAgo)
             ->getQuery()
             ->getResult();
         $this->importedResources = [];
