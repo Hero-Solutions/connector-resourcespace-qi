@@ -200,7 +200,11 @@ class Qi
     {
         $mediaInfos = [];
 
-        if (!property_exists($object, 'media') || !property_exists($object->media, 'image')) {
+        if (!property_exists($object, 'media')) {
+            return $mediaInfos;
+        }
+
+        if(!property_exists($object->media, 'image')) {
             return $mediaInfos;
         }
 
