@@ -235,16 +235,76 @@ class Qi
                 }
             }
             for ($i = 0; $i < $count; $i++) {
-                $mediaInfos[] = $allMediaInfo[$i];
+                $mediaInfos[$allMediaInfo[$i]['id']] = $allMediaInfo[$i];
             }
         }
+
+        // Update metadata using the "image" property (more reliable, but some images will be missing
+        // due to the API not returning all images in the "image" property as compared to "media.image.*")
+        if(property_exists($object, 'media')) {
+            $media = $object->media;
+            if(is_object($media)) {
+                if (!property_exists($media, 'image')) {
+                    return $mediaInfos;
+                }
+                $images = $media->image;
+            } elseif(is_array($media)) {
+                if(!array_key_exists('image', $media)) {
+                    return $mediaInfos;
+                } elseif(empty($media['image'])) {
+                    return $mediaInfos;
+                }
+                $images = $media['image'];
+            } else {
+                return $mediaInfos;
+            }
+
+            foreach ($images as $mediaItem) {
+                $mediaInfo = [
+                    'id' => $mediaItem->{'id'} ?? null,
+                    'link_dams' => $mediaItem->{'link_dams'} ?? null,
+                    'media_folder_id' => $mediaItem->{'media_folder_id'} ?? null,
+                    'filename' => $mediaItem->{'filename'} ?? null,
+                    'original_filename' => $mediaItem->{'original_filename'} ?? null,
+                    'width' => $mediaItem->{'width'} ?? null,
+                    'height' => $mediaItem->{'height'} ?? null,
+                    'filesize' => $mediaItem->{'filesize'} ?? null,
+                ];
+
+                $qiCreditFieldPrefix = $this->creditConfig['qi_field_prefix'];
+                $mediaInfo[$qiCreditFieldPrefix] = $mediaItem->{$qiCreditFieldPrefix} ?? null;
+
+                foreach ($this->creditConfig['languages'] as $language) {
+                    $fieldKey = $qiCreditFieldPrefix . '_' . $language;
+                    $mediaInfo[$fieldKey] = $mediaItem->{$fieldKey} ?? null;
+                }
+
+                foreach (array_merge($qiImportMapping, $qiMappingToSelf) as $fieldName => $dummy) {
+                    $mediaInfo[$fieldName] = $mediaItem->{$fieldName} ?? null;
+                }
+
+                $id = $mediaInfo['id'];
+                if($id !== null) {
+                    //Add to array if it does not yet exist (unlikely)
+                    if (!array_key_exists($id, $mediaInfos)) {
+                        $mediaInfos[$id] = $mediaInfo;
+                    } else {
+                        //Update existing metadata as it is more reliable
+                        foreach($mediaInfo as $key => $value) {
+                            $mediaInfos[$id][$key] = $value;
+                        }
+                    }
+                }
+            }
+        }
+
         return $mediaInfos;
     }
 
     public function getMatchingImageToBeLinked($images, $originalFilename, $width, $height, $filesize, $qiMediaFolderIds)
     {
         $result = null;
-        foreach($images as $image) {
+        foreach($images as $id => $image) {
             if(array_key_exists('media_folder_id', $image)) {
                 if(in_array($image['media_folder_id'], $qiMediaFolderIds)) {
                     if (array_key_exists('link_dams', $image)) {

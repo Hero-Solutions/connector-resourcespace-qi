@@ -198,7 +198,7 @@ class ProcessCommand extends Command
                         $resourceIsLinked = true;
                     }
 
-                    foreach ($this->qiImages[$object->id] as $image) {
+                    foreach ($this->qiImages[$object->id] as $id => $image) {
                         if ($this->qi->hasLinkDams($image)) {
                             if ($image['link_dams'] === $qiLinkDamsPrefix . $resourceId) {
                                 $hasMatchingImage = true;
@@ -482,7 +482,7 @@ class ProcessCommand extends Command
                 if(array_key_exists($ir->getObjectId(), $this->objectsByObjectId)) {
                     $linked = false;
                     $images = $this->qiImages[$ir->getObjectId()];
-                    foreach($images as $image) {
+                    foreach($images as $id => $image) {
                         if (array_key_exists('link_dams', $image)) {
                             if($image['link_dams'] === $qiLinkDamsPrefix . $ir->getResourceId()) {
                                 $linked = true;
@@ -556,7 +556,7 @@ class ProcessCommand extends Command
         foreach($this->objectsByObjectId as $objectId => $object) {
             if(!empty($this->qiImages[$objectId])) {
                 $hasLinkDams = false;
-                foreach ($this->qiImages[$objectId] as $image) {
+                foreach ($this->qiImages[$objectId] as $id => $image) {
                     if($this->qi->hasLinkDams($image)) {
                         $hasLinkDams = true;
                         break;
@@ -570,7 +570,7 @@ class ProcessCommand extends Command
                         $result = $jsonObject->get($jsonPath);
                         if (!empty($result) && is_array($result)) {
                             $result = $result[0];
-                            foreach ($this->qiImages[$objectId] as $image) {
+                            foreach ($this->qiImages[$objectId] as $id => $image) {
                                 if($this->qi->hasLinkDams($image)) {
                                     $changed = false;
                                     if (!array_key_exists($key, $image)) {
