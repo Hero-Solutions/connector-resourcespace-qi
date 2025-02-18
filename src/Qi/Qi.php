@@ -204,20 +204,20 @@ class Qi
             return $mediaInfos;
         }
 
-        if(!property_exists($object->media, 'image')) {
+        if(!property_exists($object->{'media'}, 'image')) {
             return $mediaInfos;
         }
 
-        foreach ($object->media->image as $mediaItem) {
+        foreach ($object->{'media'}->{'image'} as $mediaItem) {
             $mediaInfo = [
-                'id' => $mediaItem->id ?? null,
-                'link_dams' => $mediaItem->link_dams ?? null,
-                'media_folder_id' => $mediaItem->media_folder_id ?? null,
-                'filename' => $mediaItem->filename ?? null,
-                'original_filename' => $mediaItem->original_filename ?? null,
-                'width' => $mediaItem->width ?? null,
-                'height' => $mediaItem->height ?? null,
-                'filesize' => $mediaItem->filesize ?? null,
+                'id' => $mediaItem->{'id'} ?? null,
+                'link_dams' => $mediaItem->{'link_dams'} ?? null,
+                'media_folder_id' => $mediaItem->{'media_folder_id'} ?? null,
+                'filename' => $mediaItem->{'filename'} ?? null,
+                'original_filename' => $mediaItem->{'original_filename'} ?? null,
+                'width' => $mediaItem->{'width'} ?? null,
+                'height' => $mediaItem->{'height'} ?? null,
+                'filesize' => $mediaItem->{'filesize'} ?? null,
             ];
 
             $qiCreditFieldPrefix = $this->creditConfig['qi_field_prefix'];
