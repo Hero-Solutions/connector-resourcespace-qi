@@ -135,13 +135,13 @@ class Qi
             $this->ping();
 
             //Retrieve all objects from Qi where resources were recently added or unlinked
-            $oneMonthAgo = new DateTime('-1 month');
+            $twoWeeksAgo = new DateTime('-2 weeks');
             /* @var $importedResourcesObjects Resource[] */
             $importedResourcesObjects = $this->entityManager->createQueryBuilder()
                 ->select('r')
                 ->from(Resource::class, 'r')
-                ->where('r.importTimestamp > :oneMonthAgo')
-                ->setParameter('oneMonthAgo', $oneMonthAgo)
+                ->where('r.importTimestamp > :twoWeeksAgo')
+                ->setParameter('twoWeeksAgo', $twoWeeksAgo)
                 ->getQuery()
                 ->getResult();
             foreach($importedResourcesObjects as $importedResource) {
