@@ -199,55 +199,45 @@ class Qi
     public function getMediaInfos($object, $qiImportMapping, $qiMappingToSelf)
     {
         $mediaInfos = [];
-
-        if (!property_exists($object, 'media')) {
-            return $mediaInfos;
-        }
-
-        $media = $object->media;
-        if(is_object($media)) {
-            if (!property_exists($media, 'image')) {
-                return $mediaInfos;
+        if(property_exists($object, 'media.image.id')) {
+            $allMediaInfo = [];
+            $i = 0;
+            foreach ($object->{'media.image.id'} as $id) {
+                $allMediaInfo[$i] = [
+                    'id' => $id
+                ];
+                $i++;
             }
-            $images = $media->image;
-        } elseif(is_array($media)) {
-            if(!array_key_exists('image', $media)) {
-                return $mediaInfos;
-            } elseif(empty($media['image'])) {
-                return $mediaInfos;
-            }
-            $images = $media['image'];
-        } else {
-            return $mediaInfos;
-        }
 
-        foreach ($images as $mediaItem) {
-            $mediaInfo = [
-                'id' => $mediaItem->{'id'} ?? null,
-                'link_dams' => $mediaItem->{'link_dams'} ?? null,
-                'media_folder_id' => $mediaItem->{'media_folder_id'} ?? null,
-                'filename' => $mediaItem->{'filename'} ?? null,
-                'original_filename' => $mediaItem->{'original_filename'} ?? null,
-                'width' => $mediaItem->{'width'} ?? null,
-                'height' => $mediaItem->{'height'} ?? null,
-                'filesize' => $mediaItem->{'filesize'} ?? null,
+            $count = count($allMediaInfo);
+            $fieldsToGet = [
+                'link_dams' => '',
+                'media_folder_id' => '',
+                'filename' => '',
+                'original_filename' => '',
+                'width' => '',
+                'height' => '',
+                'filesize' => ''
             ];
-
             $qiCreditFieldPrefix = $this->creditConfig['qi_field_prefix'];
-            $mediaInfo[$qiCreditFieldPrefix] = $mediaItem->{$qiCreditFieldPrefix} ?? null;
-
-            foreach ($this->creditConfig['languages'] as $language) {
-                $fieldKey = $qiCreditFieldPrefix . '_' . $language;
-                $mediaInfo[$fieldKey] = $mediaItem->{$fieldKey} ?? null;
+            $fieldsToGet[$qiCreditFieldPrefix] = '';
+            foreach($this->creditConfig['languages'] as $language) {
+                $fieldsToGet[$qiCreditFieldPrefix . '_' . $language] = '';
             }
-
-            foreach (array_merge($qiImportMapping, $qiMappingToSelf) as $fieldName => $dummy) {
-                $mediaInfo[$fieldName] = $mediaItem->{$fieldName} ?? null;
+            $fieldsToGet = array_merge($fieldsToGet, $qiImportMapping, $qiMappingToSelf);
+            foreach ($fieldsToGet as $fieldName => $dummy) {
+                if (property_exists($object, 'media.image.' . $fieldName) && count($object->{'media.image.' . $fieldName}) === $count) {
+                    $i = 0;
+                    foreach ($object->{'media.image.' . $fieldName} as $value) {
+                        $allMediaInfo[$i][$fieldName] = $value;
+                        $i++;
+                    }
+                }
             }
-
-            $mediaInfos[] = $mediaInfo;
+            for ($i = 0; $i < $count; $i++) {
+                $mediaInfos[] = $allMediaInfo[$i];
+            }
         }
-
         return $mediaInfos;
     }
 
