@@ -204,11 +204,24 @@ class Qi
             return $mediaInfos;
         }
 
-        if(!property_exists($object->{'media'}, 'image')) {
+        $media = $object->media;
+        if(is_object($media)) {
+            if (!property_exists($media, 'image')) {
+                return $mediaInfos;
+            }
+            $images = $media->image;
+        } elseif(is_array($media)) {
+            if(!array_key_exists('image', $media)) {
+                return $mediaInfos;
+            } elseif(empty($media['image'])) {
+                return $mediaInfos;
+            }
+            $images = $media['image'];
+        } else {
             return $mediaInfos;
         }
 
-        foreach ($object->{'media'}->{'image'} as $mediaItem) {
+        foreach ($images as $mediaItem) {
             $mediaInfo = [
                 'id' => $mediaItem->{'id'} ?? null,
                 'link_dams' => $mediaItem->{'link_dams'} ?? null,
