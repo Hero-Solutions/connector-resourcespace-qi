@@ -251,12 +251,12 @@ class Qi
         return $mediaInfos;
     }
 
-    public function getMatchingImageToBeLinked($images, $originalFilename, $width, $height, $filesize, $qiMediaFolderId)
+    public function getMatchingImageToBeLinked($images, $originalFilename, $width, $height, $filesize, $qiMediaFolderIds)
     {
         $result = null;
         foreach($images as $image) {
             if(array_key_exists('media_folder_id', $image)) {
-                if($image['media_folder_id'] === $qiMediaFolderId) {
+                if(in_array($image['media_folder_id'], $qiMediaFolderIds)) {
                     if (array_key_exists('link_dams', $image)) {
                         if(empty($image['link_dams']) && array_key_exists('original_filename', $image)
                             && array_key_exists('width', $image) && array_key_exists('height', $image)

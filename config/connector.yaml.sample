@@ -187,7 +187,10 @@ parameters:
       name_fr: "$.relationship.object_title[?(@.details.language_id_name == 'Frans' and @.details.object_title_type_id_name == 'Hoofdtitel' or @.details.language_id_name == 'French' and @.details.object_title_type_id_name == 'Hoofdtitel')].name"
       name_de: "$.relationship.object_title[?(@.details.language_id_name == 'Duits' and @.details.object_title_type_id_name == 'Hoofdtitel' or @.details.language_id_name == 'German' and @.details.object_title_type_id_name == 'Hoofdtitel')].name"
     link_dams_prefix: 'https://museumstichting.resourcespace.com/?r='
-    media_folder_id: '563'
+    media_folder_ids:
+        - '563'
+        - '569'
+        - '15'
 
   # Certificate Authority (also known as 'cacert') may not work on its own depending on your system and PHP configuration,
   # that's why a cacert.pem is included in this project (from https://curl.haxx.se/docs/caextract.html).

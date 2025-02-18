@@ -114,7 +114,7 @@ class ProcessCommand extends Command
         $qiUrl = $qiConfig['url'];
         $this->qiReindexUrl = $qiConfig['reindex_url'];
         $qiLinkDamsPrefix = $qiConfig['link_dams_prefix'];
-        $qiMediaFolderId = $qiConfig['media_folder_id'];
+        $qiMediaFolderIds = $qiConfig['media_folder_ids'];
         $qiImportMapping = $qiConfig['import_mapping'];
         $qiMappingToSelf = $qiConfig['mapping_to_self'];
 
@@ -167,7 +167,7 @@ class ProcessCommand extends Command
         $this->unlinkDeletedMedia($qiLinkDamsPrefix);
 
         // Add Link DAMS and metadata to images in Qi that were imported in a previous run
-        $this->linkImportedResources($rsFields, $qiImportMapping, $qiMediaFolderId, $qiLinkDamsPrefix);
+        $this->linkImportedResources($rsFields, $qiImportMapping, $qiMediaFolderIds, $qiLinkDamsPrefix);
 
         // Update Qi image metadata with metadata from Qi objects
         $this->updateQiSelfMetadata($qiMappingToSelf);
@@ -208,7 +208,7 @@ class ProcessCommand extends Command
                             $fromRS = true;
                             if (!array_key_exists('media_folder_id', $image)) {
                                 $fromRS = false;
-                            } else if ($image['media_folder_id'] !== $qiMediaFolderId) {
+                            } else if (!in_array($image['media_folder_id'], $qiMediaFolderIds)) {
                                 $fromRS = false;
                             }
                             if (!$fromRS) {
@@ -520,7 +520,7 @@ class ProcessCommand extends Command
         }
     }
 
-    private function linkImportedResources($rsFields, $qiImportMapping, $qiMediaFolderId, $qiLinkDamsPrefix)
+    private function linkImportedResources($rsFields, $qiImportMapping, $qiMediaFolderIds, $qiLinkDamsPrefix)
     {
         foreach($this->importedResources as $ir) {
             if($ir->getLinked() === 0) {
@@ -528,7 +528,7 @@ class ProcessCommand extends Command
                 if(array_key_exists($ir->getResourceId(), $this->resourcesByResourceId) && array_key_exists($ir->getObjectId(), $this->objectsByObjectId)) {
                     $images = $this->qiImages[$ir->getObjectId()];
                     $resource = $this->resourcesByResourceId[$ir->getResourceId()];
-                    $qiImage = $this->qi->getMatchingImageToBeLinked($images, $ir->getOriginalFilename(), $ir->getWidth(), $ir->getHeight(), $ir->getFilesize(), $qiMediaFolderId);
+                    $qiImage = $this->qi->getMatchingImageToBeLinked($images, $ir->getOriginalFilename(), $ir->getWidth(), $ir->getHeight(), $ir->getFilesize(), $qiMediaFolderIds);
                     if ($qiImage !== null) {
                         if($this->update) {
                             $this->qi->updateMetadata($qiImage, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, true, $this->qiReindexUrl . $ir->getObjectId());
