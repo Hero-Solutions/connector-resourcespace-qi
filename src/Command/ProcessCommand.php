@@ -10,6 +10,7 @@ use App\Util\HttpUtil;
 use App\Util\StringUtil;
 use DateTime;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Query\Parameter;
 use JsonPath\JsonObject;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -19,6 +20,7 @@ use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 
 class ProcessCommand extends Command
 {
+    /* @var $params ParameterBagInterface */
     private $params;
     /* @var $entityManager EntityManagerInterface */
     private $entityManager;
@@ -39,7 +41,6 @@ class ProcessCommand extends Command
     private $objectsByObjectId;
     private $objectsByInventoryNumber;
     private $qiImages;
-    private $objectIdsUploadedTo;
     private $linkedResources;
     /* @var $importedResources Resource[] */
     private $importedResources;
@@ -79,12 +80,17 @@ class ProcessCommand extends Command
         if(!StringUtil::endsWith($ftpFolder, '/')) {
             $ftpFolder .= '/';
         }
+        $tmpFtpFolder = $this->params->get('tmp_ftp_folder');
+        if(!StringUtil::endsWith($tmpFtpFolder, '/')) {
+            $tmpFtpFolder .= '/';
+        }
         $ftpUser = $this->params->get('ftp_user');
         $ftpGroup = $this->params->get('ftp_group');
         $onlyOnlineRecords = $this->params->get('only_online_records');
         $recordsUpdatedSince = $this->params->get('records_updated_since');
 
         // Abort the run if the ftp folder exists and is not empty
+        //TODO send an e-mail alert if the connector has stopped working due to process hanging or ftp folder remains non-empty
         if(is_dir($ftpFolder)) {
             $files = array_diff(scandir($ftpFolder), array('.', '..'));
             if(!empty($files)) {
@@ -160,10 +166,9 @@ class ProcessCommand extends Command
             $this->qiImages[$objectId] = $this->qi->getMediaInfos($object, $qiImportMapping, $qiMappingToSelf);
         }
 
-        $this->objectIdsUploadedTo = [];
         $this->linkedResources = [];
 
-        // Remove the links in the database that no longer exist (most likely manually removed in Qi)
+        // Remove the links in the database that no longer exist (most likely images that were manually removed from Qi)
         $this->unlinkDeletedMedia($qiLinkDamsPrefix);
 
         // Add Link DAMS and metadata to images in Qi that were imported in a previous run
@@ -255,7 +260,7 @@ class ProcessCommand extends Command
                     }
                     if ($hasMatchingImage) {
                         $this->qi->updateResourceSpaceData($object, $resource, $resourceId, $rsFields, $rsImportMapping, $rsFullDataFields, $qiUrl, $this->resourceSpace);
-                    } else if (!$resourceIsLinked && !array_key_exists($object->id, $this->objectIdsUploadedTo)) {
+                    } else if (!$resourceIsLinked) {
                         echo 'Checking if resource ' . $resourceId . ' is to be uploaded to object ' . $object->id . ' (inventory number ' . $inventoryNumber . ')' . PHP_EOL;
                         $allImages = $this->resourceSpace->getAllImages($resourceId);
                         foreach ($fileSizes as $fileSize) {
@@ -264,7 +269,6 @@ class ProcessCommand extends Command
                                 if ($image['size_code'] === $fileSize) {
                                     $found = true;
                                     $filename = $object->id . '-1.' . $image['extension'];
-                                    $this->objectIdsUploadedTo[$object->id] = $object->id;
                                     echo 'Uploading resource ' . $resourceId . ' to ' . $filename . ' (inventory number ' . $inventoryNumber . ').' . PHP_EOL;
                                     if ($this->update) {
                                         if (!is_dir($ftpFolder)) {
@@ -272,7 +276,29 @@ class ProcessCommand extends Command
                                             chown($ftpFolder, $ftpUser);
                                             chgrp($ftpFolder, $ftpGroup);
                                         }
-                                        $path = $ftpFolder . $filename;
+
+                                        //Put additional images in a temporary directory so they do not overwrite each other.
+                                        //These images are processed by PlaceImagesInFtpFolderCommand
+                                        //TODO check if '-2' '-3' etc doesn't simply work as well
+                                        if(file_exists($ftpFolder . $filename)) {
+                                            if(!is_dir($tmpFtpFolder)) {
+                                                mkdir($tmpFtpFolder, 0700, true);
+                                                chown($tmpFtpFolder, $ftpUser);
+                                                chgrp($tmpFtpFolder, $ftpGroup);
+                                            }
+                                            $fileDir = $tmpFtpFolder . $object->id . '/';
+                                            if(is_dir($fileDir)) {
+                                                $count = count(glob($fileDir . '*'));
+                                                $path = $fileDir . $count . '.' . $image['extension'];
+                                            } else {
+                                                mkdir($fileDir, 0700, true);
+                                                chown($fileDir, $ftpUser);
+                                                chgrp($fileDir, $ftpGroup);
+                                                $path = $fileDir . '0.' . $image['extension'];
+                                            }
+                                        } else {
+                                            $path = $ftpFolder . $filename;
+                                        }
                                         copy($image['url'], $path);
                                         chown($path, $ftpUser);
                                         chgrp($path, $ftpGroup);
@@ -479,6 +505,7 @@ class ProcessCommand extends Command
     {
         foreach($this->importedResources as $resourceId => $ir) {
             if($ir->getLinked() > 0) {
+                //TODO what if the object is gone from Qi?
                 if(array_key_exists($ir->getObjectId(), $this->objectsByObjectId)) {
                     $linked = false;
                     $images = $this->qiImages[$ir->getObjectId()];
@@ -524,7 +551,6 @@ class ProcessCommand extends Command
     {
         foreach($this->importedResources as $ir) {
             if($ir->getLinked() === 0) {
-                $this->objectIdsUploadedTo[$ir->getObjectId()] = $ir->getObjectId();
                 if(array_key_exists($ir->getResourceId(), $this->resourcesByResourceId) && array_key_exists($ir->getObjectId(), $this->objectsByObjectId)) {
                     $images = $this->qiImages[$ir->getObjectId()];
                     $resource = $this->resourcesByResourceId[$ir->getResourceId()];
@@ -538,14 +564,18 @@ class ProcessCommand extends Command
                         }
                         $this->linkedResources[$ir->getResourceId()] = $ir->getResourceId();
                     } else {
-                        //Something went wrong, prevent images to be uploaded to this object during this run
-                        $this->objectIdsUploadedTo[$ir->getObjectId()] = $ir->getObjectId();
                         echo 'ERROR: No matching image found for resource ' . $ir->getResourceId() . ' with object ' . $ir->getObjectId() . ' (inventory number ' . $ir->getInventoryNumber() . ')' . PHP_EOL;
+                        //If problem persists for 2 weeks, automatically mark the resource as unlinked
+                        if($ir->getImportTimestamp() < new DateTime('-2 weeks')) {
+                            $this->unlinkResource($ir);
+                        }
                     }
                 } else {
-                    //Something went wrong, prevent images to be uploaded to this object during this run
-                    $this->objectIdsUploadedTo[$ir->getObjectId()] = $ir->getObjectId();
                     echo 'ERROR: No match found for resource ' . $ir->getResourceId() . ' with object ' . $ir->getObjectId() . ' (inventory number ' . $ir->getInventoryNumber() . ')' . PHP_EOL;
+                    //If problem persists for 2 weeks, automatically mark the resource as unlinked
+                    if($ir->getImportTimestamp() < new DateTime('-2 weeks')) {
+                        $this->unlinkResource($ir);
+                    }
                 }
             }
         }
