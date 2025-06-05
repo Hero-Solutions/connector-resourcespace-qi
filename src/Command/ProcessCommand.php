@@ -288,8 +288,11 @@ class ProcessCommand extends Command
                                             }
                                             $fileDir = $tmpFtpFolder . $object->id . '/';
                                             if(is_dir($fileDir)) {
-                                                $count = count(glob($fileDir . '*'));
-                                                $path = $fileDir . $count . '.' . $image['extension'];
+                                                $i = 0;
+                                                do {
+                                                    $path = $fileDir . $i . '.' . $image['extension'];
+                                                    $i++;
+                                                } while (file_exists($path));
                                             } else {
                                                 mkdir($fileDir, 0700, true);
                                                 chown($fileDir, $ftpUser);
