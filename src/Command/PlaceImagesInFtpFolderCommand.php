@@ -60,11 +60,11 @@ class PlaceImagesInFtpFolderCommand extends Command
                                         chgrp($ftpFolder, $ftpGroup);
                                     }
                                     if(!rename($filePath, $targetFile)) {
-                                        $output->writeln('Error moving ' . $filePath . ' to ' . $targetFile);
+                                        echo 'Error moving ' . $filePath . ' to ' . $targetFile . PHP_EOL;
                                     }
                                 }
                                 if($this->debug) {
-                                    $output->writeln('Moved file ' . $filePath . ' to ' . $targetFile);
+                                   echo 'Moved file ' . $filePath . ' to ' . $targetFile . PHP_EOL;
                                 }
                             }
                         }
@@ -74,7 +74,7 @@ class PlaceImagesInFtpFolderCommand extends Command
                             unlink($path);
                         }
                         if($this->debug) {
-                            $output->writeln('Deleted empty directory ' . $path);
+                            echo 'Deleted empty directory ' . $path . PHP_EOL;
                         }
                     }
                 }
