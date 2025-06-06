@@ -67,6 +67,7 @@ class PlaceImagesInFtpFolderCommand extends Command
                                    echo 'Moved file ' . $filePath . ' to ' . $targetFile . PHP_EOL;
                                 }
                             }
+                            break;
                         }
                     }
                     if(count(glob($path . '*')) == 0) {
