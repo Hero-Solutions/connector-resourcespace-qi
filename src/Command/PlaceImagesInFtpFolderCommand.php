@@ -70,7 +70,7 @@ class PlaceImagesInFtpFolderCommand extends Command
                             break;
                         }
                     }
-                    if(count(glob($path . '*')) == 0) {
+                    if(count(glob($path . '/*')) == 0) {
                         if($this->update) {
                             unlink($path);
                         }
