@@ -42,35 +42,32 @@ class PlaceImagesInFtpFolderCommand extends Command
         }
 
         if(is_dir($ftpFolder) && is_dir($tmpFtpFolder)) {
-            foreach (scandir($tmpFtpFolder) as $entry) {
-                $path = $tmpFtpFolder . $entry;
-                if (is_dir($path) && $entry !== '.' && $entry !== '..') {
-                    if(preg_match('/^[0-9]+$/', $entry)) {
-                        $objectId = $entry;
-                        foreach (scandir($path) as $file) {
-                            $filePath = $path . '/' . $file;
-                            if (is_file($filePath)) {
-                                $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-                                $targetFile = $ftpFolder . $objectId . '-1.' . $extension;
-                                if (!file_exists($targetFile)) {
-                                    if($this->update) {
-                                        if(!rename($filePath, $targetFile)) {
-                                            $output->writeln('Error moving ' . $filePath . ' to ' . $targetFile);
-                                        }
+            foreach (scandir($tmpFtpFolder) as $objectId) {
+                $path = $tmpFtpFolder . $objectId;
+                if (is_dir($path) && $objectId !== '.' && $objectId !== '..' && preg_match('/^[0-9]+$/', $objectId)) {
+                    foreach (scandir($path) as $file) {
+                        $filePath = $path . '/' . $file;
+                        if (is_file($filePath)) {
+                            $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+                            $targetFile = $ftpFolder . $objectId . '-1.' . $extension;
+                            if (!file_exists($targetFile)) {
+                                if($this->update) {
+                                    if(!rename($filePath, $targetFile)) {
+                                        $output->writeln('Error moving ' . $filePath . ' to ' . $targetFile);
                                     }
-                                    if($this->debug) {
-                                        $output->writeln('Moved file ' . $filePath . PHP_EOL);
-                                    }
+                                }
+                                if($this->debug) {
+                                    $output->writeln('Moved file ' . $filePath . ' to ' . $targetFile);
                                 }
                             }
                         }
-                        if(count(glob($path . '*')) == 0) {
-                            if($this->update) {
-                                unlink($path);
-                            }
-                            if($this->debug) {
-                                $output->writeln('Deleted empty directory ' . $path . PHP_EOL);
-                            }
+                    }
+                    if(count(glob($path . '*')) == 0) {
+                        if($this->update) {
+                            unlink($path);
+                        }
+                        if($this->debug) {
+                            $output->writeln('Deleted empty directory ' . $path);
                         }
                     }
                 }

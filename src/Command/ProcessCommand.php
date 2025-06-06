@@ -270,7 +270,7 @@ class ProcessCommand extends Command
                             foreach ($allImages as $image) {
                                 if ($image['size_code'] === $fileSize) {
                                     $found = true;
-                                    $filename = $object->id . '-1.' . $image['extension'];
+                                    $filename = $object->id . '-1.' . strtolower($image['extension']);
                                     echo 'Uploading resource ' . $resourceId . ' to ' . $filename . ' (inventory number ' . $inventoryNumber . ').' . PHP_EOL;
                                     if ($this->update) {
                                         if (!is_dir($ftpFolder)) {
@@ -292,14 +292,14 @@ class ProcessCommand extends Command
                                             if(is_dir($fileDir)) {
                                                 $i = 0;
                                                 do {
-                                                    $path = $fileDir . $i . '.' . $image['extension'];
+                                                    $path = $fileDir . $i . '.' . strtolower($image['extension']);
                                                     $i++;
                                                 } while (file_exists($path));
                                             } else {
                                                 mkdir($fileDir, 0700, true);
                                                 chown($fileDir, $ftpUser);
                                                 chgrp($fileDir, $ftpGroup);
-                                                $path = $fileDir . '0.' . $image['extension'];
+                                                $path = $fileDir . '0.' . strtolower($image['extension']);
                                             }
                                         } else {
                                             $path = $ftpFolder . $filename;
