@@ -43,7 +43,7 @@ class PlaceImagesInFtpFolderCommand extends Command
         $ftpUser = $this->params->get('ftp_user');
         $ftpGroup = $this->params->get('ftp_group');
 
-        if(is_dir($ftpFolder) && is_dir($tmpFtpFolder)) {
+        if(is_dir($tmpFtpFolder)) {
             foreach (scandir($tmpFtpFolder) as $objectId) {
                 $path = $tmpFtpFolder . $objectId;
                 if (is_dir($path) && $objectId !== '.' && $objectId !== '..' && preg_match('/^[0-9]+$/', $objectId)) {
