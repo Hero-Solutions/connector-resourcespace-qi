@@ -141,11 +141,13 @@ class ProcessCommand extends Command
             ->getQuery()
             ->getResult();
         $this->importedResources = [];
+        $indexedObjects = [];
         foreach($importedResourcesObjects as $importedResource) {
             $this->importedResources[$importedResource->getResourceId()] = $importedResource;
-            if($importedResource->getLinked() === 0) {
+            if($importedResource->getLinked() === 0 && !array_key_exists($importedResource->getObjectId(), $indexedObjects)) {
                 if($this->update) {
                     $this->httpUtil->get($this->qiReindexUrl . $importedResource->getObjectId());
+                    $indexedObjects[$importedResource->getObjectId()] = $importedResource->getObjectId();
                 }
             }
         }
