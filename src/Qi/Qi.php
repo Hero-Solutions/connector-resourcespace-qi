@@ -144,9 +144,13 @@ class Qi
                 ->setParameter('twoWeeksAgo', $twoWeeksAgo)
                 ->getQuery()
                 ->getResult();
+            $loadedObjects = [];
             foreach($importedResourcesObjects as $importedResource) {
-                $objsJson = $this->get($this->baseUrl . '/get/object/id/' . $importedResource->getObjectId() . '/_fields/' . urlencode($this->getFields));
-                $this->storeObjects($objsJson);
+                if(!array_key_exists($importedResource->getResourceId(), $loadedObjects)) {
+                    $objsJson = $this->get($this->baseUrl . '/get/object/id/' . $importedResource->getObjectId() . '/_fields/' . urlencode($this->getFields));
+                    $this->storeObjects($objsJson);
+                    $loadedObjects[$importedResource->getResourceId()] = $importedResource->getResourceId();
+                }
             }
         }
     }
