@@ -146,10 +146,10 @@ class Qi
                 ->getResult();
             $loadedObjects = [];
             foreach($importedResourcesObjects as $importedResource) {
-                if(!array_key_exists($importedResource->getResourceId(), $loadedObjects)) {
+                if(!array_key_exists($importedResource->getObjectId(), $loadedObjects)) {
                     $objsJson = $this->get($this->baseUrl . '/get/object/id/' . $importedResource->getObjectId() . '/_fields/' . urlencode($this->getFields));
                     $this->storeObjects($objsJson);
-                    $loadedObjects[$importedResource->getResourceId()] = $importedResource->getResourceId();
+                    $loadedObjects[$importedResource->getObjectId()] = $importedResource->getObjectId();
                 }
             }
         }
