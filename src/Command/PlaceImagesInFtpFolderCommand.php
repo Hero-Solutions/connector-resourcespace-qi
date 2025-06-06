@@ -72,7 +72,7 @@ class PlaceImagesInFtpFolderCommand extends Command
                     }
                     if(count(glob($path . '/*')) == 0) {
                         if($this->update) {
-                            unlink($path);
+                            rmdir($path);
                         }
                         if($this->debug) {
                             echo 'Deleted empty directory ' . $path . PHP_EOL;
