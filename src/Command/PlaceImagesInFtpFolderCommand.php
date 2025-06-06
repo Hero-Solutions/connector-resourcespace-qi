@@ -40,6 +40,8 @@ class PlaceImagesInFtpFolderCommand extends Command
         if(!StringUtil::endsWith($tmpFtpFolder, '/')) {
             $tmpFtpFolder .= '/';
         }
+        $ftpUser = $this->params->get('ftp_user');
+        $ftpGroup = $this->params->get('ftp_group');
 
         if(is_dir($ftpFolder) && is_dir($tmpFtpFolder)) {
             foreach (scandir($tmpFtpFolder) as $objectId) {
@@ -52,6 +54,11 @@ class PlaceImagesInFtpFolderCommand extends Command
                             $targetFile = $ftpFolder . $objectId . '-1.' . $extension;
                             if (!file_exists($targetFile)) {
                                 if($this->update) {
+                                    if (!is_dir($ftpFolder)) {
+                                        mkdir($ftpFolder, 0700, true);
+                                        chown($ftpFolder, $ftpUser);
+                                        chgrp($ftpFolder, $ftpGroup);
+                                    }
                                     if(!rename($filePath, $targetFile)) {
                                         $output->writeln('Error moving ' . $filePath . ' to ' . $targetFile);
                                     }
