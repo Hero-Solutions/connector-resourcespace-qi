@@ -89,16 +89,6 @@ class ProcessCommand extends Command
         $onlyOnlineRecords = $this->params->get('only_online_records');
         $recordsUpdatedSince = $this->params->get('records_updated_since');
 
-        // Abort the run if the ftp folder exists and is not empty
-        //TODO send an e-mail alert if the connector has stopped working due to process hanging or ftp folder remains non-empty
-        if(is_dir($ftpFolder)) {
-            $files = array_diff(scandir($ftpFolder), array('.', '..'));
-            if(!empty($files)) {
-                echo 'Aborted - ftp folder is not empty!' . PHP_EOL;
-                return;
-            }
-        }
-
         $allowedExtensions = $this->params->get('allowed_extensions');
         $allowedFiletypes = $this->params->get('allowed_filetypes');
         $fileSizes = $this->params->get('file_sizes');
