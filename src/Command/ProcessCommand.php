@@ -65,9 +65,11 @@ class ProcessCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
+        file_put_contents('/tmp/connector_process.pid', getmypid());
         $this->verbose = $input->getOption('verbose');
         $this->fullProcessing = $input->getOption('full-processing');
         $this->process();
+        unlink('/tmp/connector_process.pid');
         return 0;
     }
 
@@ -174,7 +176,7 @@ class ProcessCommand extends Command
                 foreach ($resources as $resourceId => $resource) {
                     // Skip resources that are already linked to an object in Qi
                     if (array_key_exists($resourceId, $this->linkedResources)) {
-                        echo 'Skipping resource ' . $resourceId . 'as it is already linked in Qi.' . PHP_EOL;
+                        echo 'Skipping resource ' . $resourceId . ' as it is already linked in Qi.' . PHP_EOL;
                         continue;
                     }
                     $inventoryNumber = $resource[$rsFields['inventorynumber']];
