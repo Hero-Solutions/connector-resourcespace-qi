@@ -298,25 +298,31 @@ class ProcessCommand extends Command
                                         } else {
                                             $path = $ftpFolder . $filename;
                                         }
-                                        copy($image['url'], $path);
-                                        chown($path, $ftpUser);
-                                        chgrp($path, $ftpGroup);
-                                        chmod($path, 0600);
+                                        if(copy($image['url'], $path)) {
+                                            chown($path, $ftpUser);
+                                            chgrp($path, $ftpGroup);
+                                            chmod($path, 0600);
 
-                                        $resourceObject = new Resource();
-                                        $resourceObject->setImportTimestamp(new DateTime());
-                                        $resourceObject->setResourceId($resourceId);
-                                        $resourceObject->setObjectId($object->id);
-                                        $resourceObject->setInventoryNumber($inventoryNumber);
-                                        $resourceObject->setOriginalFilename($filename);
-                                        $size = getimagesize($path);
-                                        $resourceObject->setWidth($size[0]);
-                                        $resourceObject->setHeight($size[1]);
-                                        $resourceObject->setFilesize(filesize($path));
-                                        $resourceObject->setLinked(0);
-                                        $this->entityManager->persist($resourceObject);
-                                        $this->importedResources[$resourceId] = $resourceObject;
-                                        $this->entityManager->flush();
+                                            //Clear the file status cache to ensure we're not getting wrong filesize value
+                                            clearstatcache(true, $path);
+
+                                            $resourceObject = new Resource();
+                                            $resourceObject->setImportTimestamp(new DateTime());
+                                            $resourceObject->setResourceId($resourceId);
+                                            $resourceObject->setObjectId($object->id);
+                                            $resourceObject->setInventoryNumber($inventoryNumber);
+                                            $resourceObject->setOriginalFilename($filename);
+                                            $size = getimagesize($path);
+                                            $resourceObject->setWidth($size[0]);
+                                            $resourceObject->setHeight($size[1]);
+                                            $resourceObject->setFilesize(filesize($path));
+                                            $resourceObject->setLinked(0);
+                                            $this->entityManager->persist($resourceObject);
+                                            $this->importedResources[$resourceId] = $resourceObject;
+                                            $this->entityManager->flush();
+                                        } else {
+                                            echo 'Error downloading resource ' . $resourceId . ' to ' . $path . ' (inventory number ' . $inventoryNumber . ').' . PHP_EOL;
+                                        }
                                     }
                                     break;
                                 }
