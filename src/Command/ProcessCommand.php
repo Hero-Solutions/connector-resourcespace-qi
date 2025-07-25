@@ -199,11 +199,13 @@ class ProcessCommand extends Command
 
                     foreach ($this->qiImages[$object->id] as $id => $image) {
                         if ($this->qi->hasLinkDams($image)) {
+                            //Update metadata for images that were automatically imported from ResourceSpace to Qi
                             if ($image['link_dams'] === $qiLinkDamsPrefix . $resourceId) {
                                 $hasMatchingImage = true;
                                 $this->qi->updateMetadata($image, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, false, $this->qiReindexUrl . $object->id);
                             }
                         } else if (!$resourceIsLinked && array_key_exists('filename', $image)) {
+                            //Link older images in Qi that once were manually copied from ResourceSpace to Qi
                             $fromRS = true;
                             if (!array_key_exists('media_folder_id', $image)) {
                                 $fromRS = false;
