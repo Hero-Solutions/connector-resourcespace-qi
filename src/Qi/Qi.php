@@ -413,8 +413,8 @@ class Qi
 
             $jsonObject = new JsonObject($object);
             foreach ($rsImportMapping as $fieldName => $field) {
-                $res = $this->getFieldData($jsonObject, $fieldName, $field);
-                if ($res !== null) {
+                $qiFieldData = $this->getFieldData($jsonObject, $fieldName, $field);
+                if ($qiFieldData !== null) {
                     $fieldId = $rsFields[$fieldName];
                     $fetchFullData = false;
                     if(array_key_exists($fieldId, $resource)) {
@@ -432,38 +432,42 @@ class Qi
                         if($field['overwrite'] === 'no') {
                             if (!empty($resource[$fieldId])) {
                                 if ($this->debug) {
-                                    echo 'Not overwriting field ' . $fieldName . ' for res ' . $res . ' (already has ' . $resource[$fieldId] . ')' . PHP_EOL;
+                                    echo 'Not overwriting field ' . $fieldName . ' for res ' . $qiFieldData . ' (already has ' . $resource[$fieldId] . ')' . PHP_EOL;
                                 }
-                                $res = null;
+                                $qiFieldData = null;
                             }
                         } else if($field['overwrite'] === 'merge') {
                             if (!empty($resource[$fieldId])) {
-                                if (strpos($resource[$fieldId], $res) === false) {
+                                if (strpos($resource[$fieldId], $qiFieldData) === false) {
                                     if ($this->debug) {
-                                        echo 'Merging field ' . $fieldName . ' for res ' . $res . ' (already has ' . $resource[$fieldId] . ')' . PHP_EOL;
+                                        echo 'Merging field ' . $fieldName . ' for res ' . $qiFieldData . ' (already has ' . $resource[$fieldId] . ')' . PHP_EOL;
                                     }
-                                    $res = $resource[$fieldId] . '\n\n' . $res;
+                                    $qiFieldData = $resource[$fieldId] . '\n\n' . $qiFieldData;
                                 } else {
                                     if ($this->debug) {
-                                        echo 'Not merging field ' . $fieldName . ' for res ' . $res . ' (already has ' . $resource[$fieldId] . ')' . PHP_EOL;
+                                        echo 'Not merging field ' . $fieldName . ' for res ' . $qiFieldData . ' (already has ' . $resource[$fieldId] . ')' . PHP_EOL;
                                     }
-                                    $res = null;
+                                    $qiFieldData = null;
                                 }
                             }
                         }
                     }
-                    if($res !== null) {
-                        if(strlen($res) > $this->maxFieldValueLength) {
-                            $res = substr($res, 0, $this->maxFieldValueLength);
+                    if($qiFieldData !== null) {
+                        if(strlen($qiFieldData) > $this->maxFieldValueLength) {
+                            $qiFieldData = substr($qiFieldData, 0, $this->maxFieldValueLength);
                         }
                         $update = true;
                         if(array_key_exists($fieldId, $resource)) {
-                            if($resource[$fieldId] === $res || empty($resource[$fieldId]) && empty($res)) {
+                            if($resource[$fieldId] === $qiFieldData || empty($resource[$fieldId]) && empty($qiFieldData)) {
                                 $update = false;
+                            } else if(array_key_exists('type', $field) && $field['type'] === 'date_range') {
+                                //Date ranges need to be YYYY-MM-DD/YYYY-MM-DD when passed to the ResourceSpace API,
+                                //but are returned as YYYY-MM-DD, YYYY-MM-DD when fetched from the ResourceSpace API
+                                $update = str_replace($resource[$fieldId], ', ', '/') !== $qiFieldData;
                             } else {
-                                // Mostly for keywords, check if both fields contain the same comma-separated values but in a different order
+                                // Mostly for keywords, check if both fields contain the same comma-separated values (but in a different order)
                                 $expl1 = explode(',', $resource[$fieldId]);
-                                $expl2 = explode(',', $res);
+                                $expl2 = explode(',', $qiFieldData);
                                 if(count($expl1) === count($expl2)) {
                                     $vals1 = [];
                                     $vals2 = [];
@@ -491,7 +495,7 @@ class Qi
                                 }
                             }
                             if (!$this->test) {
-                                $resourceSpace->updateField($resourceId, $fieldName, $res, $nodeValue);
+                                $resourceSpace->updateField($resourceId, $fieldName, $qiFieldData, $nodeValue);
                             }
                         }
                     }
