@@ -320,6 +320,8 @@ class ProcessCommand extends Command
                                             $this->entityManager->persist($resourceObject);
                                             $this->importedResources[$resourceId] = $resourceObject;
                                             $this->entityManager->flush();
+
+                                            $this->qi->updateResourceSpaceData($object, $resource, $resourceId, $rsFields, $rsImportMapping, $rsFullDataFields, $qiUrl, $this->resourceSpace);
                                         } else {
                                             echo 'Error downloading resource ' . $resourceId . ' to ' . $path . ' (inventory number ' . $inventoryNumber . ').' . PHP_EOL;
                                         }
