@@ -460,26 +460,30 @@ class Qi
                         if(array_key_exists($fieldId, $resource)) {
                             if($resource[$fieldId] === $qiFieldData || empty($resource[$fieldId]) && empty($qiFieldData)) {
                                 $update = false;
-                            } else if(array_key_exists('type', $field) && $field['type'] === 'date_range') {
-                                //Date ranges need to be YYYY-MM-DD/YYYY-MM-DD when passed to the ResourceSpace API,
-                                //but are returned as YYYY-MM-DD, YYYY-MM-DD when fetched from the ResourceSpace API
-                                $update = str_replace($resource[$fieldId], ', ', '/') !== $qiFieldData;
                             } else {
-                                // Mostly for keywords, check if both fields contain the same comma-separated values (but in a different order)
-                                $expl1 = explode(',', $resource[$fieldId]);
-                                $expl2 = explode(',', $qiFieldData);
-                                if(count($expl1) === count($expl2)) {
-                                    $vals1 = [];
-                                    $vals2 = [];
-                                    foreach($expl1 as $val) {
-                                        $vals1[] = trim($val);
+                                // Mostly for keywords and date ranges, check if both fields contain the same comma-separated values (but in a different order)
+                                $oldRSDataSplit = explode(',', $resource[$fieldId]);
+                                $newQiDataSplit = explode(',', $qiFieldData);
+                                if(array_key_exists('type', $field)) {
+                                    //Date ranges need to be YYYY-MM-DD/YYYY-MM-DD when passed to the ResourceSpace API,
+                                    //but are returned as YYYY-MM-DD, YYYY-MM-DD when fetched from the ResourceSpace API.
+                                    //Furthermore, the dates returned from the ResourceSpace API may be in reversed order
+                                    if($field['type'] === 'date_range') {
+                                        $newQiDataSplit = explode('/', $qiFieldData);
                                     }
-                                    foreach($expl2 as $val) {
-                                        $vals2[] = trim($val);
-                                    }
+                                }
+                                if(count($oldRSDataSplit) === count($newQiDataSplit)) {
                                     $update = false;
-                                    foreach($vals1 as $val) {
-                                        if(!in_array($val, $vals2)) {
+                                    $oldRSDataSplitTrimmed = [];
+                                    $newQiDataSpitTrimmed = [];
+                                    foreach($oldRSDataSplit as $val) {
+                                        $oldRSDataSplitTrimmed[] = trim($val);
+                                    }
+                                    foreach($newQiDataSplit as $val) {
+                                        $newQiDataSpitTrimmed[] = trim($val);
+                                    }
+                                    foreach($oldRSDataSplitTrimmed as $val) {
+                                        if(!in_array($val, $newQiDataSpitTrimmed)) {
                                             $update = true;
                                             break;
                                         }
@@ -488,14 +492,14 @@ class Qi
                             }
                         }
                         if($update) {
-                            $nodeValue = false;
+                            $isNodeValue = false;
                             if (array_key_exists('node_value', $field)) {
                                 if ($field['node_value'] === 'yes') {
-                                    $nodeValue = true;
+                                    $isNodeValue = true;
                                 }
                             }
                             if (!$this->test) {
-                                $resourceSpace->updateField($resourceId, $fieldName, $qiFieldData, $nodeValue);
+                                $resourceSpace->updateField($resourceId, $fieldName, $qiFieldData, $isNodeValue);
                             }
                         }
                     }
