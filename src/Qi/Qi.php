@@ -728,7 +728,11 @@ class Qi
                     rsort($toDatesList);
 
                     if(!empty($fromDatesList) && !empty($toDatesList)) {
-                        return $fromDatesList[0] . '/' . $toDatesList[0];
+                        if($fromDatesList[0] === $toDatesList[0]) {
+                            return $fromDatesList[0];
+                        } else {
+                            return $fromDatesList[0] . '/' . $toDatesList[0];
+                        }
                     }
                 }
             } else {
