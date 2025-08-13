@@ -5,6 +5,7 @@ namespace App\Qi;
 use App\Entity\QiObject;
 use App\Entity\Resource;
 use App\ResourceSpace\ResourceSpace;
+use App\Util\HttpUtil;
 use DateTime;
 use Doctrine\ORM\EntityManager;
 use JsonPath\InvalidJsonException;
@@ -12,29 +13,26 @@ use JsonPath\JsonObject;
 
 class Qi
 {
-    /** @var $entityManager EntityManager */
-    private $entityManager;
+    private Entitymanager $entityManager;
 
-    private $baseUrl;
-    private $username;
-    private $password;
-    private $getFields;
-    private $overrideCertificateAuthorityFile;
-    private $sslCertificateAuthorityFile;
-    private $creditConfig;
-    private $test;
-    private $debug;
-    private $update;
-    private $fullProcessing;
-    private $onlyOnlineRecords;
-    private $unknownMappings = [];
-    private $httpUtil;
-    private $maxFieldValueLength;
+    private string $baseUrl;
+    private string $username;
+    private string $password;
+    private string $getFields;
+    private array $creditConfig;
+    private bool $test;
+    private bool $debug;
+    private bool $update;
+    private bool $fullProcessing;
+    private bool $onlyOnlineRecords;
+    private array $unknownMappings = [];
+    private HttpUtil $httpUtil;
+    private int $maxFieldValueLength;
 
-    private $objectsByObjectId;
-    private $objectsByInventoryNumber;
+    private array $objectsByObjectId;
+    private array $objectsByInventoryNumber;
 
-    public function __construct($entityManager, $qi, $sslCertificateAuthority, $creditConfig, $test, $debug, $update, $fullProcessing, $onlyOnlineRecords, $httpUtil, $maxFieldValueLength)
+    public function __construct($entityManager, $qi, $creditConfig, $test, $debug, $update, $fullProcessing, $onlyOnlineRecords, $httpUtil, $maxFieldValueLength)
     {
         $this->entityManager = $entityManager;
 
@@ -44,8 +42,6 @@ class Qi
         $this->password = $qiApi['password'];
         $this->getFields = $qi['get_fields'];
 
-        $this->overrideCertificateAuthorityFile = $sslCertificateAuthority['override'];
-        $this->sslCertificateAuthorityFile = $sslCertificateAuthority['authority_file'];
         $this->creditConfig = $creditConfig;
 
         $this->test = $test;
@@ -58,17 +54,17 @@ class Qi
         $this->maxFieldValueLength = $maxFieldValueLength;
     }
 
-    public function getObjectsByObjectId()
+    public function getObjectsByObjectId(): array
     {
         return $this->objectsByObjectId;
     }
 
-    public function getObjectsByInventoryNumber()
+    public function getObjectsByInventoryNumber(): array
     {
         return $this->objectsByInventoryNumber;
     }
 
-    public function retrieveAllObjects($recordsUpdatedSince)
+    public function retrieveAllObjects($recordsUpdatedSince): void
     {
         $this->objectsByObjectId = [];
         $this->objectsByInventoryNumber = [];
@@ -155,7 +151,7 @@ class Qi
         }
     }
 
-    private function storeObjects($objsJson)
+    private function storeObjects($objsJson): int
     {
         $objs = json_decode($objsJson);
         $records = $objs->records;
@@ -166,7 +162,7 @@ class Qi
         return $count;
     }
 
-    private function extractRecord($record)
+    private function extractRecord($record): void
     {
         if(!$this->onlyOnlineRecords || $record->online === '1') {
             $this->objectsByObjectId[intval($record->id)] = $record;
@@ -192,7 +188,7 @@ class Qi
         }
     }
 
-    private function ping()
+    private function ping(): void
     {
         $connection = $this->entityManager->getConnection();
         if (!$connection->isConnected()) {
@@ -200,7 +196,7 @@ class Qi
         }
     }
 
-    public function getMediaInfos($object, $qiImportMapping, $qiMappingToSelf)
+    public function getMediaInfos($object, $qiImportMapping, $qiMappingToSelf): array
     {
         $mediaInfos = [];
         if(property_exists($object, 'media.image.id')) {
@@ -305,7 +301,7 @@ class Qi
         return $mediaInfos;
     }
 
-    public function getMatchingImageToBeLinked($images, $originalFilename, $width, $height, $filesize, $qiMediaFolderIds)
+    public function getMatchingImageToBeLinked($images, $originalFilename, $width, $height, $filesize, $qiMediaFolderIds): array|null
     {
         $result = null;
         foreach($images as $id => $image) {
@@ -328,7 +324,7 @@ class Qi
         return $result;
     }
 
-    public function updateMetadata($qiImage, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, $addLinkDams, $reindexUrl)
+    public function updateMetadata($qiImage, $resource, $rsFields, $qiImportMapping, $qiLinkDamsPrefix, $addLinkDams, $reindexUrl): void
     {
         $resourceId = $resource['ref'];
         $record = [];
@@ -397,7 +393,7 @@ class Qi
         }
     }
 
-    public function updateResourceSpaceData($object, $resource, $resourceId, $rsFields, $rsImportMapping, $rsFullDataFields, $qiUrl, ResourceSpace $resourceSpace)
+    public function updateResourceSpaceData($object, $resource, $resourceId, $rsFields, $rsImportMapping, $rsFullDataFields, $qiUrl, ResourceSpace $resourceSpace): void
     {
         try {
             $linkCms = $qiUrl . $object->id;
@@ -510,7 +506,7 @@ class Qi
         }
     }
 
-    private function translateCredit($credit)
+    private function translateCredit($credit): array
     {
         $split = [
             $credit
@@ -560,11 +556,12 @@ class Qi
         return $translatedCredit;
     }
 
-    public function putMetadata($data) {
-        $this->put($this->baseUrl . '/put/media', json_encode($data));
+    public function putMetadata($data): string|bool
+    {
+        return $this->put($this->baseUrl . '/put/media', json_encode($data));
     }
 
-    public function getFieldData($jsonObject, $fieldName, $field)
+    public function getFieldData($jsonObject, $fieldName, $field): string|null
     {
         $res = null;
         if(array_key_exists('type', $field)) {
@@ -774,7 +771,8 @@ class Qi
         return $res;
     }
 
-    private function resultsToArray($results) {
+    private function resultsToArray($results): array
+    {
         if(is_string($results)) {
             return [ $results ];
         }
@@ -784,14 +782,16 @@ class Qi
         return [];
     }
 
-    public function filterField($field) {
+    public function filterField($field): string
+    {
         $field = str_replace("<i>", '\'', $field);
         $field = str_replace("</i>", '\'', $field);
         $field = str_replace("\n", ' ', $field);
         return $field;
     }
 
-    public function getMaxDaysInMonth($year, $month) {
+    public function getMaxDaysInMonth($year, $month) : string
+    {
         switch($month) {
             default:
             case '01':
@@ -820,7 +820,7 @@ class Qi
         }
     }
 
-    public function hasLinkDams($image)
+    public function hasLinkDams($image): bool
     {
         if (array_key_exists('link_dams', $image)) {
             if (!empty($image['link_dams'])) {
@@ -830,82 +830,24 @@ class Qi
         return false;
     }
 
-    public function get($url)
+    public function get($url): string|bool
     {
-        if($this->debug) {
-            echo $url . PHP_EOL;
-        }
-
-        $ch = curl_init();
-        if ($this->overrideCertificateAuthorityFile) {
-            curl_setopt($ch,CURLOPT_CAINFO, $this->sslCertificateAuthorityFile);
-            curl_setopt($ch,CURLOPT_CAPATH, $this->sslCertificateAuthorityFile);
-        }
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-        curl_setopt($ch, CURLOPT_USERPWD, $this->username . ':' . $this->password);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 300);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 300);
-
-        $resultJson = curl_exec($ch);
-        if($resultJson === false) {
-            echo 'HTTP error: ' . curl_error($ch) . PHP_EOL;
-        } else if (!curl_errno($ch)) {
-            switch ($http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE)) {
-                case 200:  # OK
-                    break;
-                default:
-                    echo 'HTTP error ' .  $http_code . ': ' . $resultJson . PHP_EOL;
-                    $resultJson = false;
-                    break;
-            }
-        }
-        curl_close($ch);
-        return $resultJson;
+        return $this->httpUtil->get($url, $this->username, $this->password);
     }
 
-    public function put($url, $json)
+    public function put($url, $json): string|bool
     {
         if($this->debug) {
             echo $url . PHP_EOL;
             echo $json . PHP_EOL;
         }
         if(!$this->update) {
-            return;
+            return false;
         }
-
         $headers = array (
             "Content-Type: application/json; charset=utf-8",
             "Content-Length: " . strlen($json)
         );
-
-        $ch = curl_init();
-        if ($this->overrideCertificateAuthorityFile) {
-            curl_setopt($ch,CURLOPT_CAINFO, $this->sslCertificateAuthorityFile);
-            curl_setopt($ch,CURLOPT_CAPATH, $this->sslCertificateAuthorityFile);
-        }
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PUT");
-        curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-        curl_setopt($ch, CURLOPT_USERPWD, $this->username . ':' . $this->password);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $json);
-
-        $resultJson = curl_exec($ch);
-        if($resultJson === false) {
-            echo 'HTTP error: ' . curl_error($ch) . PHP_EOL;
-        } else if (!curl_errno($ch)) {
-            switch ($http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE)) {
-                case 200:  # OK
-                    break;
-                default:
-                    echo 'HTTP error ' .  $http_code . ': ' . $resultJson . PHP_EOL;
-                    break;
-            }
-        }
-        curl_close($ch);
-        return $resultJson;
+        return $this->httpUtil->put($url, $headers, $json, $this->username, $this->password);
     }
 }

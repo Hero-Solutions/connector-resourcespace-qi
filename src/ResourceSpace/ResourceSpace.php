@@ -2,13 +2,15 @@
 
 namespace App\ResourceSpace;
 
+use App\Util\HttpUtil;
+
 class ResourceSpace
 {
-    private $apiUrl;
-    private $apiUsername;
-    private $apiKey;
-    private $maxFieldValueLength;
-    private $httpUtil;
+    private string $apiUrl;
+    private string $apiUsername;
+    private string $apiKey;
+    private int $maxFieldValueLength;
+    private HttpUtil $httpUtil;
 
     public function __construct($resourceSpaceApi, $httpUtil)
     {
@@ -19,7 +21,7 @@ class ResourceSpace
         $this->httpUtil = $httpUtil;
     }
 
-    public function getAllResources($search)
+    public function getAllResources($search): mixed
     {
         $allResources = $this->doApiCall('do_search&param1=' . $search);
 
@@ -29,16 +31,15 @@ class ResourceSpace
             return NULL;
         }
 
-        $resources = json_decode($allResources, true);
-        return $resources;
+        return json_decode($allResources, true);
     }
 
-    public function getResourceData($id)
+    public function getResourceData($id): array
     {
         return $this->getResourceFieldDataAsAssocArray($this->getRawResourceFieldData($id));
     }
 
-    public function getResourceFieldDataAsAssocArray($data)
+    public function getResourceFieldDataAsAssocArray($data): array
     {
         $result = array();
         foreach ($data as $field) {
@@ -47,19 +48,19 @@ class ResourceSpace
         return $result;
     }
 
-    public function getRawResourceFieldData($id)
+    public function getRawResourceFieldData($id): mixed
     {
         $data = $this->doApiCall('get_resource_field_data&param1=' . $id);
         return json_decode($data, true);
     }
 
-    public function getResourceUrl($id, $extension)
+    public function getResourceUrl($id, $extension): mixed
     {
         $data = $this->doApiCall('get_resource_path&param1=' . $id . '&param2=0&param5=' . $extension);
         return json_decode($data, true);
     }
 
-    public function updateField($id, $field, $value, $nodeValue = false)
+    public function updateField($id, $field, $value, $nodeValue = false): mixed
     {
         if(strlen($value) > $this->maxFieldValueLength) {
             $value = substr($value, 0, $this->maxFieldValueLength);
@@ -68,21 +69,20 @@ class ResourceSpace
         return json_decode($data, true);
     }
 
-    public function getAllImages($id)
+    public function getAllImages($id): mixed
     {
         $data = $this->doApiCall('get_resource_all_image_sizes&param1=' . $id);
         return json_decode($data, true);
     }
 
-    private function doApiCall($query)
+    private function doApiCall($query): string|bool
     {
         $query = 'user=' . str_replace(' ', '+', $this->apiUsername) . '&function=' . $query;
         $url = $this->apiUrl . '?' . $query . '&sign=' . $this->getSign($query);
-        $data = $this->httpUtil->get($url);
-        return $data;
+        return $this->httpUtil->get($url);
     }
 
-    private function getSign($query)
+    private function getSign($query): string
     {
         return hash('sha256', $this->apiKey . $query);
     }

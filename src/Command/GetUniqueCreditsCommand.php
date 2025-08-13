@@ -5,6 +5,7 @@ namespace App\Command;
 use App\Entity\Resource;
 use App\Qi\Qi;
 use App\ResourceSpace\ResourceSpace;
+use App\Util\HttpUtil;
 use App\Util\StringUtil;
 use Doctrine\ORM\EntityManagerInterface;
 use JsonPath\InvalidJsonException;
@@ -16,11 +17,12 @@ use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 
 class GetUniqueCreditsCommand extends Command
 {
-    private $params;
+    private ParameterBagInterface $params;
 
-    private $resourceSpace;
+    private ResourceSpace $resourceSpace;
+    private bool $verbose;
 
-    protected function configure()
+    protected function configure(): void
     {
         $this
             ->setName('app:get-unique-credits')
@@ -33,19 +35,21 @@ class GetUniqueCreditsCommand extends Command
         parent::__construct();
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $this->verbose = $input->getOption('verbose');
         $this->test();
         return 0;
     }
 
-    private function test()
+    private function test(): void
     {
         $rsConfig = $this->params->get('resourcespace');
         $rsFields = $rsConfig['fields'];
 
-        $this->resourceSpace = new ResourceSpace($rsConfig['api']);
+        $sslCertificateAuthority = $this->params->get('ssl_certificate_authority');
+        $httpUtil = new HttpUtil($sslCertificateAuthority, true);
+        $this->resourceSpace = new ResourceSpace($rsConfig['api'], $httpUtil);
         $allResources = $this->resourceSpace->getAllResources(urlencode($rsConfig['search_query']));
 
         $allCredits = [];

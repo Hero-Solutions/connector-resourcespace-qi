@@ -4,33 +4,29 @@
     "minimum-stability": "stable",
     "prefer-stable": true,
     "require": {
-        "php": ">=7.2.5",
+        "php": ">=8.4",
         "ext-ctype": "*",
-        "ext-curl": "^7.4",
+        "ext-curl": "*",
         "ext-iconv": "*",
-        "ext-json": "^7.4",
-        "doctrine/doctrine-bundle": "^2.6",
-        "doctrine/doctrine-migrations-bundle": "^3.2",
-        "doctrine/orm": "^2.12",
-        "galbar/jsonpath": "^2.0",
-        "symfony/console": "5.3.*",
-        "symfony/dotenv": "5.3.*",
-        "symfony/flex": "^1.19",
-        "symfony/framework-bundle": "5.3.*",
-        "symfony/proxy-manager-bridge": "5.3.*",
-        "symfony/runtime": "5.3.*",
-        "symfony/yaml": "5.3.*"
+        "ext-json": "*",
+        "doctrine/doctrine-bundle": "^2.15.1",
+        "doctrine/orm": "^3.5.2",
+        "galbar/jsonpath": "^3.0",
+        "symfony/console": "7.3.*",
+        "symfony/dotenv": "7.3.*",
+        "symfony/flex": "^2.8.1",
+        "symfony/framework-bundle": "7.3.*",
+        "symfony/runtime": "7.3.*",
+        "symfony/yaml": "7.3.*"
     },
     "config": {
-        "optimize-autoloader": true,
-        "preferred-install": {
-            "*": "dist"
-        },
-        "sort-packages": true,
         "allow-plugins": {
+            "php-http/discovery": true,
             "symfony/flex": true,
             "symfony/runtime": true
-        }
+        },
+        "bump-after-update": true,
+        "sort-packages": true
     },
     "autoload": {
         "psr-4": {
@@ -45,7 +41,12 @@
     "replace": {
         "symfony/polyfill-ctype": "*",
         "symfony/polyfill-iconv": "*",
-        "symfony/polyfill-php72": "*"
+        "symfony/polyfill-php72": "*",
+        "symfony/polyfill-php73": "*",
+        "symfony/polyfill-php74": "*",
+        "symfony/polyfill-php80": "*",
+        "symfony/polyfill-php81": "*",
+        "symfony/polyfill-php82": "*"
     },
     "scripts": {
         "auto-scripts": {
@@ -65,7 +66,7 @@
     "extra": {
         "symfony": {
             "allow-contrib": false,
-            "require": "5.3.*"
+            "require": "7.3.*"
         }
     }
 }

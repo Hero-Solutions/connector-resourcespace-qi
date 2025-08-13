@@ -10,12 +10,11 @@ use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 
 class PlaceImagesInFtpFolderCommand extends Command
 {
-    /* @var $params ParameterBagInterface */
-    private $params;
-    private $debug;
-    private $update;
+    private ParameterBagInterface $params;
+    private bool $debug;
+    private bool $update;
 
-    protected function configure()
+    protected function configure(): void
     {
         $this
             ->setName('app:place-images-in-ftp-folder')
@@ -28,7 +27,7 @@ class PlaceImagesInFtpFolderCommand extends Command
         parent::__construct();
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $this->debug = $this->params->get('debug');
         $this->update = $this->params->get('update');
