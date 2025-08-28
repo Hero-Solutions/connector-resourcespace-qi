@@ -368,6 +368,10 @@ class ProcessCommand extends Command
 
     private function filenamesMatch($resourceId, $rsFilename, $qiFilename): bool
     {
+        if(empty($rsFilename) || empty($qiFilename)) {
+            return false;
+        }
+
         $rsFilenameLower = strtolower($rsFilename);
         $qiFilenameLower = strtolower($qiFilename);
 

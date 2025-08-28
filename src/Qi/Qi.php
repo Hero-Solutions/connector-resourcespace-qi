@@ -192,7 +192,7 @@ class Qi
     {
         $connection = $this->entityManager->getConnection();
         if (!$connection->isConnected()) {
-            $connection->connect();
+            $connection->getNativeConnection();
         }
     }
 
@@ -591,10 +591,10 @@ class Qi
                             if(!empty($valueResults)) {
                                 if(array_key_exists('format', $field)) {
                                     $res = $field['format'];
-                                    if(strpos($field['format'], '$key') !== false) {
+                                    if(str_contains($field['format'], '$key')) {
                                         $res = str_replace('$key', $key, $field['format']);
                                     }
-                                    if(strpos($field['format'], '$value') !== false) {
+                                    if(str_contains($field['format'], '$value')) {
                                         $res = str_replace('$value', self::filterField($valueResults[0]), $res);
                                     }
                                 } else if($key !== null) {
@@ -691,7 +691,9 @@ class Qi
                         }
                     }
                     foreach ($toDates as $date) {
-                        $date = str_replace('/__', '', $date);
+                        if(!empty($date)) {
+                            $date = str_replace('/__', '', $date);
+                        }
                         if (!preg_match('/^[0-9]{1,4}-[0-9][0-9]-[0-9][0-9]$/', $date)) {
                             if (preg_match('/^[0-9]{1,4}\/[0-9][0-9]\/[0-9][0-9]$/', $date)) {
                                 $date = str_replace('/', '-', $date);
@@ -784,10 +786,12 @@ class Qi
 
     public function filterField($field): string
     {
+        if(empty($field)) {
+            return $field;
+        }
         $field = str_replace("<i>", '\'', $field);
         $field = str_replace("</i>", '\'', $field);
-        $field = str_replace("\n", ' ', $field);
-        return $field;
+        return str_replace("\n", ' ', $field);
     }
 
     public function getMaxDaysInMonth($year, $month) : string
