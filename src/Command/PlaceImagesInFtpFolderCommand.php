@@ -32,11 +32,11 @@ class PlaceImagesInFtpFolderCommand extends Command
         $this->debug = $this->params->get('debug');
         $this->update = $this->params->get('update');
         $ftpFolder = $this->params->get('ftp_folder');
-        if(!StringUtil::endsWith($ftpFolder, '/')) {
+        if(!str_ends_with($ftpFolder, '/')) {
             $ftpFolder .= '/';
         }
         $tmpFtpFolder = $this->params->get('tmp_ftp_folder');
-        if(!StringUtil::endsWith($tmpFtpFolder, '/')) {
+        if(!str_ends_with($tmpFtpFolder, '/')) {
             $tmpFtpFolder .= '/';
         }
         $ftpUser = $this->params->get('ftp_user');

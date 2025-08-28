@@ -88,11 +88,11 @@ class ProcessCommand extends Command
         $this->debug = $this->params->get('debug');
         $this->update = $this->params->get('update');
         $this->ftpFolder = $this->params->get('ftp_folder');
-        if (!StringUtil::endsWith($this->ftpFolder, '/')) {
+        if (!str_ends_with($this->ftpFolder, '/')) {
             $this->ftpFolder .= '/';
         }
         $this->tmpFtpFolder = $this->params->get('tmp_ftp_folder');
-        if (!StringUtil::endsWith($this->tmpFtpFolder, '/')) {
+        if (!str_ends_with($this->tmpFtpFolder, '/')) {
             $this->tmpFtpFolder .= '/';
         }
         $this->ftpUser = $this->params->get('ftp_user');
@@ -403,12 +403,12 @@ class ProcessCommand extends Command
             return true;
         }
 
-        if(StringUtil::endsWith($rsFilenameUnderscores, ' (r)')) {
+        if(str_ends_with($rsFilenameUnderscores, ' (r)')) {
             $rsFilenameUnderscores = substr($rsFilenameUnderscores, 0, -4) . '_r';
             if ($rsFilenameUnderscores === $qiFilenameUnderscores) {
                 return true;
             }
-        } else if(StringUtil::endsWith($rsFilenameUnderscores, ' (v)')) {
+        } else if(str_ends_with($rsFilenameUnderscores, ' (v)')) {
             $rsFilenameUnderscores = substr($rsFilenameUnderscores, 0, -4) . '_v';
             if ($rsFilenameUnderscores === $qiFilenameUnderscores) {
                 return true;
@@ -421,27 +421,27 @@ class ProcessCommand extends Command
             return true;
         }
 
-        if (StringUtil::endsWith($qiFilenameUnderscores, '_1')) {
+        if (str_ends_with($qiFilenameUnderscores, '_1')) {
             $qiFilenameUnderscores = substr($qiFilenameUnderscores, 0, -2);
             if ($rsFilenameUnderscores === $qiFilenameUnderscores) {
                 return true;
             }
         }
 
-        if (StringUtil::endsWith($rsFilenameUnderscores, '_1')) {
+        if (str_ends_with($rsFilenameUnderscores, '_1')) {
             $rsFilenameUnderscores = substr($rsFilenameUnderscores, 0, -2);
             if ($rsFilenameUnderscores === $qiFilenameUnderscores) {
                 return true;
             }
         }
 
-        if(StringUtil::startsWith($qiFilenameUnderscores, 'as')) {
+        if(str_starts_with($qiFilenameUnderscores, 'as')) {
             $qiFilenameUnderscores = substr($qiFilenameUnderscores, 1);
             if ($rsFilenameUnderscores === $qiFilenameUnderscores) {
                 return true;
             }
         }
-        if(StringUtil::startsWith($rsFilenameUnderscores, 'as')) {
+        if(str_starts_with($rsFilenameUnderscores, 'as')) {
             $rsFilenameUnderscores = substr($rsFilenameUnderscores, 1);
             if ($rsFilenameUnderscores === $qiFilenameUnderscores) {
                 return true;
@@ -478,7 +478,7 @@ class ProcessCommand extends Command
                     if (!empty($inventoryNumber)) {
                         $forbiddenInventoryNumber = false;
                         foreach ($forbiddenInventoryNumberPrefixes as $prefix) {
-                            if (StringUtil::startsWith($inventoryNumber, $prefix)) {
+                            if (str_starts_with($inventoryNumber, $prefix)) {
                                 $forbiddenInventoryNumber = true;
                                 break;
                             }
@@ -487,7 +487,7 @@ class ProcessCommand extends Command
                             $forbiddenFilename = false;
                             $filenameWithoutExtension = pathinfo($rsFilename, PATHINFO_FILENAME);
                             foreach ($forbiddenFilenamePostfixes as $postfix) {
-                                if (StringUtil::endsWith($filenameWithoutExtension, $postfix)) {
+                                if (str_ends_with($filenameWithoutExtension, $postfix)) {
                                     $forbiddenFilename = true;
                                     break;
                                 }
