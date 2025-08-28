@@ -591,9 +591,6 @@ class Qi
                             $valueResults = self::resultsToArray($object->get($field['value_path']));
                             if(!empty($valueResults)) {
                                 $firstValueResult = self::filterField($valueResults[0]);
-                                if(empty($firstValueResult)) {
-                                    $firstValueResult = '';
-                                }
                                 if(array_key_exists('format', $field)) {
                                     $res = $field['format'];
                                     if(str_contains($field['format'], '$key')) {
@@ -792,7 +789,7 @@ class Qi
     public function filterField($field): string
     {
         if(empty($field)) {
-            return $field;
+            return '';
         }
         $field = str_replace("<i>", '\'', $field);
         $field = str_replace("</i>", '\'', $field);
