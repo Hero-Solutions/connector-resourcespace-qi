@@ -414,7 +414,7 @@ class Qi
                     $fieldId = $rsFields[$fieldName];
                     $fetchFullData = false;
                     if(array_key_exists($fieldId, $resource)) {
-                        if(strlen($resource[$fieldId]) >= 180) {
+                        if(!empty($resource[$fieldId]) && strlen($resource[$fieldId]) >= 180) {
                             $fetchFullData = true;
                         }
                     }
@@ -544,6 +544,7 @@ class Qi
                     $translatedCredit[$qiFieldPrefix . $language] .= $item;
                 }
             } else {
+                $item = $item ?? '';
                 $before = strlen($item) - strlen(ltrim($item));
                 $left = substr($item, 0, $before);
                 $after = strlen($item) - strlen(rtrim($item));
@@ -589,24 +590,28 @@ class Qi
                             }
                             $valueResults = self::resultsToArray($object->get($field['value_path']));
                             if(!empty($valueResults)) {
+                                $firstValueResult = self::filterField($valueResults[0]);
+                                if(empty($firstValueResult)) {
+                                    $firstValueResult = '';
+                                }
                                 if(array_key_exists('format', $field)) {
                                     $res = $field['format'];
                                     if(str_contains($field['format'], '$key')) {
-                                        $res = str_replace('$key', $key, $field['format']);
+                                        $res = str_replace('$key', empty($key) ? '' : $key, $field['format']);
                                     }
                                     if(str_contains($field['format'], '$value')) {
-                                        $res = str_replace('$value', self::filterField($valueResults[0]), $res);
+                                        $res = str_replace('$value', $firstValueResult, $res);
                                     }
                                 } else if($key !== null) {
-                                    $res = $key . ': ' . self::filterField($valueResults[0]);
+                                    $res = $key . ': ' . $firstValueResult;
                                 } else {
-                                    $res = self::filterField($valueResults[0]);
+                                    $res = $firstValueResult;
                                 }
                             } else if($key !== null) {
                                 $res = $key;
                             }
                         }
-                        if($res !== null) {
+                        if(!empty($res)) {
                             $results[] = $res;
                         }
                     }
