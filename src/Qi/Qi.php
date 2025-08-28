@@ -458,7 +458,7 @@ class Qi
                                 $update = false;
                             } else {
                                 // Mostly for keywords and date ranges, check if both fields contain the same comma-separated values (but in a different order)
-                                $oldRSDataSplit = empty($resource[$fieldId]) ? $resource[$fieldId] : explode(',', $resource[$fieldId]);
+                                $oldRSDataSplit = empty($resource[$fieldId]) ? [] : explode(',', $resource[$fieldId]);
                                 $newQiDataSplit = explode(',', $qiFieldData);
                                 if(array_key_exists('type', $field)) {
                                     //Date ranges need to be YYYY-MM-DD/YYYY-MM-DD when passed to the ResourceSpace API,
@@ -514,7 +514,7 @@ class Qi
         foreach($this->creditConfig['split_chars'] as $splitChar) {
             $newSplit = [];
             foreach($split as $item) {
-                $splitItem = empty($item) ? $item : explode($splitChar, $item);
+                $splitItem = empty($item) ? [] : explode($splitChar, $item);
                 $count = count($splitItem);
                 for($i = 0; $i < $count; $i++) {
                     $newSplit[] = $splitItem[$i];
