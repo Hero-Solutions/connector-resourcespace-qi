@@ -807,11 +807,12 @@ class Qi
             case '12':
                 return '31';
             case '02':
-                if ($year % 400 === 0) {
+                $yearI = intval($year);
+                if ($yearI % 400 === 0) {
                     return '29';
-                } elseif ($year % 100 === 0) {
+                } elseif ($yearI % 100 === 0) {
                     return '28';
-                } elseif ($year % 4 === 0) {
+                } elseif ($yearI % 4 === 0) {
                     return '29';
                 } else {
                     return '28';
