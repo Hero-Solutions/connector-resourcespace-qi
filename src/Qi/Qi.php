@@ -641,12 +641,12 @@ class Qi
                     $fromDates = [];
                     $toDates = [];
                     foreach($fromDatesRes as $date) {
-                        if(strlen($date) > 0) {
+                        if(!empty($date)) {
                             $fromDates[] = $date;
                         }
                     }
                     foreach($toDatesRes as $date) {
-                        if(strlen($date) > 0) {
+                        if(!empty($date)) {
                             $toDates[] = $date;
                         }
                     }
