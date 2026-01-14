@@ -186,7 +186,7 @@ class ProcessCommand extends Command
 
     private function offloadResources(): void
     {
-        foreach ($this->resourcesByFilename as $inventoryNumber => $resourcesByEnding) {
+        foreach ($this->resourcesByFilename as $invNr => $resourcesByEnding) {
             foreach($resourcesByEnding as $ending => $resources) {
                 foreach ($resources as $resourceId => $resource) {
                     // Skip resources that are already linked to an object in Qi
@@ -194,7 +194,7 @@ class ProcessCommand extends Command
                         echo 'Skipping resource ' . $resourceId . ' as it is already linked in Qi.' . PHP_EOL;
                         continue;
                     }
-                    $inventoryNumber = $resource[$this->rsFields['inventorynumber']];
+                    $inventoryNumber = trim($resource[$this->rsFields['inventorynumber']]);
                     if (empty($inventoryNumber)) {
                         continue;
                     }
@@ -459,7 +459,7 @@ class ProcessCommand extends Command
         foreach($allResources as $resource) {
             $linkWithCms = $resource[$this->rsFields['linkwithcms']];
             if(array_key_exists($linkWithCms, $rsLinkWithCmsValues)) {
-                echo 'Resource ' . $resource['ref'] . ' for inventory number ' . $resource[$this->rsFields['inventorynumber']] . PHP_EOL;
+                echo 'Resource ' . $resource['ref'] . ' for inventory number ' . trim($resource[$this->rsFields['inventorynumber']]) . PHP_EOL;
                 $rsFilename = $resource[$this->rsFields['originalfilename']];
                 $extension = strtolower(pathinfo($rsFilename, PATHINFO_EXTENSION));
 
@@ -474,7 +474,7 @@ class ProcessCommand extends Command
                 }
 
                 if (in_array($extension, $allowedExtensions) || in_array($fileExtension, $allowedExtensions) || in_array($filetype, $allowedFiletypes)) {
-                    $inventoryNumber = $resource[$this->rsFields['inventorynumber']];
+                    $inventoryNumber = trim($resource[$this->rsFields['inventorynumber']]);
                     if (!empty($inventoryNumber)) {
                         $forbiddenInventoryNumber = false;
                         foreach ($forbiddenInventoryNumberPrefixes as $prefix) {
