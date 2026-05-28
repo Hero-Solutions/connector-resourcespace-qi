@@ -76,16 +76,7 @@ class Qi
                 ->getQuery()
                 ->execute();
         } else {
-            //Retrieve alle cached Qi object data from MySQL
-            /* @var $qiObjects QiObject[] */
-            $qiObjects = $this->entityManager->createQueryBuilder()
-                ->select('q')
-                ->from(QiObject::class, 'q')
-                ->getQuery()
-                ->getResult();
-            foreach($qiObjects as $qiObject) {
-                $this->extractRecord(json_decode($qiObject->getMetadata()));
-            }
+            $this->loadCachedObjects();
         }
 
         //Get all records of up to 1 week ago
@@ -102,7 +93,7 @@ class Qi
             }
         }
 
-        $count = $this->storeObjects($objsJson);
+        $count = $this->storeObjects($objsJson, !$this->fullProcessing);
 
         for($i = 1; !$this->test && $i <= intval(($count + 499) / 500) - 1; $i++) {
             echo 'Sleeping' . PHP_EOL;
@@ -123,10 +114,15 @@ class Qi
                 }
             }
 
-            $this->storeObjects($objsJson);
+            $this->storeObjects($objsJson, !$this->fullProcessing);
         }
 
-        if(!$this->fullProcessing) {
+        if($this->fullProcessing) {
+            $this->entityManager->flush();
+            $this->entityManager->clear(QiObject::class);
+            unset($objsJson);
+            $this->loadCachedObjects();
+        } else {
 
             $this->ping();
 
@@ -151,13 +147,28 @@ class Qi
         }
     }
 
-    private function storeObjects($objsJson): int
+    private function loadCachedObjects(): void
+    {
+        // Use DBAL instead of Doctrine ORM here to avoid keeping all QiObject entities managed in memory.
+        $result = $this->entityManager->getConnection()->executeQuery('SELECT metadata FROM qi_object');
+        foreach($result->iterateAssociative() as $qiObject) {
+            $this->extractRecord(json_decode($qiObject['metadata']));
+        }
+        $result->free();
+    }
+
+    private function storeObjects($objsJson, bool $indexObjects = true): int
     {
         $objs = json_decode($objsJson);
         $records = $objs->records;
         $count = $objs->count;
         foreach($records as $record) {
-            $this->extractRecord($record);
+            if($indexObjects) {
+                $this->extractRecord($record);
+            }
+            if($this->fullProcessing) {
+                $this->storeCachedObject($record);
+            }
         }
         return $count;
     }
@@ -172,20 +183,19 @@ class Qi
                 echo 'Error: Qi record ' . $record->id . ' has no inventory number' . PHP_EOL;
             }
         }
-        if($this->fullProcessing) {
-            $this->ping();
+    }
 
-            //Store in MySQL for faster processing in the next cycles
-            //First, find if an object with this ID already exists
-            $qiObject = $this->entityManager->getRepository(QiObject::class)->find(intval($record->id));
-            if (!$qiObject) {
-                $qiObject = new QiObject();
-                $qiObject->setObjectId(intval($record->id));
-            }
-            $qiObject->setMetadata(json_encode($record));
-            $this->entityManager->persist($qiObject);
-            $this->entityManager->flush();
-        }
+    private function storeCachedObject($record): void
+    {
+        $this->ping();
+
+        //Store in MySQL for faster processing in the next cycles
+        $qiObject = new QiObject();
+        $qiObject->setObjectId(intval($record->id));
+        $qiObject->setMetadata(json_encode($record));
+        $this->entityManager->persist($qiObject);
+        $this->entityManager->flush();
+        $this->entityManager->detach($qiObject);
     }
 
     private function ping(): void
