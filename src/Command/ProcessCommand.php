@@ -459,7 +459,9 @@ class ProcessCommand extends Command
         foreach($allResources as $resource) {
             $linkWithCms = $resource[$this->rsFields['linkwithcms']];
             if(array_key_exists($linkWithCms, $rsLinkWithCmsValues)) {
-                echo 'Resource ' . $resource['ref'] . ' for inventory number ' . trim($resource[$this->rsFields['inventorynumber']]) . PHP_EOL;
+                if($this->debug) {
+                    echo 'Resource ' . $resource['ref'] . ' for inventory number ' . trim($resource[$this->rsFields['inventorynumber']]) . PHP_EOL;
+                }
                 $rsFilename = $resource[$this->rsFields['originalfilename']];
                 $extension = strtolower(pathinfo($rsFilename, PATHINFO_EXTENSION));
 
