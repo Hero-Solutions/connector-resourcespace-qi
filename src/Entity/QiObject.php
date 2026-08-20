@@ -6,6 +6,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'qi_object')]
+// This mapping defines the active cache table. Full refreshes populate and swap the table through DBAL.
 class QiObject
 {
     #[ORM\Id]

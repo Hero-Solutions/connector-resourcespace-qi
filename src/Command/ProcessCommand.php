@@ -12,6 +12,7 @@ use DateTime;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Query\Parameter;
 use JsonPath\JsonObject;
+use RuntimeException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -74,12 +75,29 @@ class ProcessCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $lockFile = fopen('/tmp/connector_process.lock', 'c');
+        if($lockFile === false) {
+            throw new RuntimeException('Could not open the connector process lock file.');
+        }
+        if(!flock($lockFile, LOCK_EX | LOCK_NB)) {
+            fclose($lockFile);
+            $output->writeln('<error>Another connector process is already running.</error>');
+            return Command::FAILURE;
+        }
+
         file_put_contents('/tmp/connector_process.pid', getmypid());
-        $this->verbose = $input->getOption('verbose');
-        $this->fullProcessing = $input->getOption('full-processing');
-        $this->process();
-        unlink('/tmp/connector_process.pid');
-        return 0;
+        try {
+            $this->verbose = $input->getOption('verbose');
+            $this->fullProcessing = $input->getOption('full-processing');
+            $this->process();
+            return Command::SUCCESS;
+        } finally {
+            if(file_exists('/tmp/connector_process.pid')) {
+                unlink('/tmp/connector_process.pid');
+            }
+            flock($lockFile, LOCK_UN);
+            fclose($lockFile);
+        }
     }
 
     private function process(): void

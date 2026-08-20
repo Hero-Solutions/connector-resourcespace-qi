@@ -2,17 +2,28 @@
 
 namespace App\Qi;
 
-use App\Entity\QiObject;
 use App\Entity\Resource;
 use App\ResourceSpace\ResourceSpace;
 use App\Util\HttpUtil;
 use DateTime;
 use Doctrine\ORM\EntityManager;
+use JsonException;
 use JsonPath\InvalidJsonException;
 use JsonPath\JsonObject;
+use RuntimeException;
+use Throwable;
 
 class Qi
 {
+    private const CACHE_TABLE = 'qi_object';
+    private const STAGING_TABLE = 'qi_object_staging';
+    private const PREVIOUS_CACHE_TABLE = 'qi_object_previous';
+    private const PAGE_SIZE = 500;
+    private const MAX_PAGE_RETRIEVAL_ATTEMPTS = 3;
+    private const MAX_SINGLE_OBJECT_RETRIEVAL_ATTEMPTS = 1;
+    private const PAGE_DELAY_SECONDS = 300;
+    private const RETRY_DELAY_SECONDS = 60;
+
     private Entitymanager $entityManager;
 
     private string $baseUrl;
@@ -69,113 +80,301 @@ class Qi
         $this->objectsByObjectId = [];
         $this->objectsByInventoryNumber = [];
 
-        if($this->fullProcessing) {
-            //Clear all cached Qi object data from MySQL
-            $this->entityManager->createQueryBuilder()
-                ->delete(QiObject::class, 'q')
-                ->getQuery()
-                ->execute();
-        } else {
-            $this->loadCachedObjects();
-        }
-
-        //Get all records of up to 1 week ago
-        $time = strtotime('-' . $recordsUpdatedSince, time());
-        $date = date("Y-m-d", $time);
-
-        if($this->test) {
-            $objsJson = $this->get($this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields) . '/_offset/12929');
-        } else {
+        try {
             if($this->fullProcessing) {
-                $objsJson = $this->get($this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields));
+                $this->prepareStagingTable();
             } else {
-                $objsJson = $this->get($this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields) . '/_since/' . $date);
+                $this->loadCachedObjects();
             }
-        }
 
-        $count = $this->storeObjects($objsJson, !$this->fullProcessing);
+            //Get all records of up to 1 week ago
+            $time = strtotime('-' . $recordsUpdatedSince, time());
+            $date = date("Y-m-d", $time);
 
-        for($i = 1; !$this->test && $i <= intval(($count + 499) / 500) - 1; $i++) {
-            echo 'Sleeping' . PHP_EOL;
-            sleep(300);
-            $tries = 0;
-            while($tries < 10) {
+            if($this->test) {
+                $firstPageUrl = $this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields) . '/_offset/12929';
+            } else {
+                $firstPageUrl = $this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields);
+                if(!$this->fullProcessing) {
+                    $firstPageUrl .= '/_since/' . $date;
+                }
+            }
+
+            $page = $this->retrieveObjectsPage($firstPageUrl);
+            $seenObjectIds = [];
+            $this->registerPageObjectIds($page, $seenObjectIds);
+            $this->storeObjects($page, !$this->fullProcessing);
+            $receivedPageSize = count($page->records);
+            $offset = 0;
+
+            while(!$this->test && $receivedPageSize >= self::PAGE_SIZE) {
+                $offset += $receivedPageSize;
+                $this->waitBeforeNextRequest();
                 if($this->fullProcessing) {
-                    $objsJson = $this->get($this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields) . '/_offset/' . ($i * 500));
+                    $pageUrl = $this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields) . '/_offset/' . $offset;
                 } else {
-                    $objsJson = $this->get($this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields) . '/_since/' . $date . '/_offset/' . ($i * 500));
+                    $pageUrl = $this->baseUrl . '/get/object/_fields/' . urlencode($this->getFields) . '/_since/' . $date . '/_offset/' . $offset;
                 }
-                if($objsJson === false) {
-                    $tries++;
-                    echo 'Sleeping' . PHP_EOL;
-                    sleep(300);
-                } else {
-                    $tries = 10;
+
+                $page = $this->retrieveObjectsPage($pageUrl);
+                $receivedPageSize = count($page->records);
+                $registeredIds = $this->registerPageObjectIds($page, $seenObjectIds);
+                if($receivedPageSize >= self::PAGE_SIZE) {
+                    if($registeredIds['valid'] === 0) {
+                        throw new RuntimeException(
+                            'Qi returned a full page at offset ' . $offset
+                            . ' without any usable object IDs; aborting pagination.'
+                        );
+                    }
+                    if($registeredIds['new'] === 0) {
+                        throw new RuntimeException(
+                            'Qi returned a full page at offset ' . $offset
+                            . ' without any new object IDs; aborting pagination.'
+                        );
+                    }
                 }
+                $this->storeObjects($page, !$this->fullProcessing);
             }
 
-            $this->storeObjects($objsJson, !$this->fullProcessing);
+            if($this->fullProcessing) {
+                $this->activateStagedCache();
+                $this->loadCachedObjects();
+            } else {
+
+                $this->ping();
+
+                //Retrieve all objects from Qi where resources were recently added or unlinked
+                $twoWeeksAgo = new DateTime('-2 weeks');
+                /* @var $importedResourcesObjects Resource[] */
+                $importedResourcesObjects = $this->entityManager->createQueryBuilder()
+                    ->select('r')
+                    ->from(Resource::class, 'r')
+                    ->where('r.importTimestamp > :twoWeeksAgo')
+                    ->setParameter('twoWeeksAgo', $twoWeeksAgo)
+                    ->getQuery()
+                    ->getResult();
+                $loadedObjects = [];
+                foreach($importedResourcesObjects as $importedResource) {
+                    if(!array_key_exists($importedResource->getObjectId(), $loadedObjects)) {
+                        $objectUrl = $this->baseUrl . '/get/object/id/' . $importedResource->getObjectId() . '/_fields/' . urlencode($this->getFields);
+                        try {
+                            $objectsPage = $this->retrieveObjectsPage(
+                                $objectUrl,
+                                self::MAX_SINGLE_OBJECT_RETRIEVAL_ATTEMPTS
+                            );
+                            $this->storeObjects($objectsPage);
+                        } catch(Throwable $exception) {
+                            echo 'Could not retrieve Qi object ' . $importedResource->getObjectId()
+                                . ': ' . $exception->getMessage() . PHP_EOL;
+                        }
+                        $loadedObjects[$importedResource->getObjectId()] = $importedResource->getObjectId();
+                    }
+                }
+            }
+        } catch(Throwable $exception) {
+            if($this->fullProcessing) {
+                $this->discardStagingTable();
+            }
+            throw $exception;
         }
+    }
 
-        if($this->fullProcessing) {
-            $this->entityManager->flush();
-            $this->entityManager->clear(QiObject::class);
-            unset($objsJson);
-            $this->loadCachedObjects();
-        } else {
+    private function prepareStagingTable(): void
+    {
+        $this->ping();
+        $connection = $this->entityManager->getConnection();
+        $connection->executeStatement('DROP TABLE IF EXISTS ' . self::STAGING_TABLE);
+        $connection->executeStatement('CREATE TABLE ' . self::STAGING_TABLE . ' LIKE ' . self::CACHE_TABLE);
+    }
 
+    private function discardStagingTable(): void
+    {
+        try {
             $this->ping();
+            $this->entityManager->getConnection()->executeStatement('DROP TABLE IF EXISTS ' . self::STAGING_TABLE);
+        } catch(Throwable $cleanupException) {
+            echo 'Could not remove the incomplete Qi staging table: ' . $cleanupException->getMessage() . PHP_EOL;
+        }
+    }
 
-            //Retrieve all objects from Qi where resources were recently added or unlinked
-            $twoWeeksAgo = new DateTime('-2 weeks');
-            /* @var $importedResourcesObjects Resource[] */
-            $importedResourcesObjects = $this->entityManager->createQueryBuilder()
-                ->select('r')
-                ->from(Resource::class, 'r')
-                ->where('r.importTimestamp > :twoWeeksAgo')
-                ->setParameter('twoWeeksAgo', $twoWeeksAgo)
-                ->getQuery()
-                ->getResult();
-            $loadedObjects = [];
-            foreach($importedResourcesObjects as $importedResource) {
-                if(!array_key_exists($importedResource->getObjectId(), $loadedObjects)) {
-                    $objsJson = $this->get($this->baseUrl . '/get/object/id/' . $importedResource->getObjectId() . '/_fields/' . urlencode($this->getFields));
-                    $this->storeObjects($objsJson);
-                    $loadedObjects[$importedResource->getObjectId()] = $importedResource->getObjectId();
+    private function activateStagedCache(): void
+    {
+        $this->ping();
+        $connection = $this->entityManager->getConnection();
+        $currentCount = (int) $connection->fetchOne('SELECT COUNT(*) FROM ' . self::CACHE_TABLE);
+        $stagedCount = (int) $connection->fetchOne('SELECT COUNT(*) FROM ' . self::STAGING_TABLE);
+        if($stagedCount === 0) {
+            throw new RuntimeException('Qi returned zero usable objects; refusing to replace the active cache.');
+        }
+        echo 'Replacing the Qi cache containing ' . $currentCount . ' objects with '
+            . $stagedCount . ' staged objects.' . PHP_EOL;
+
+        $connection->executeStatement('DROP TABLE IF EXISTS ' . self::PREVIOUS_CACHE_TABLE);
+        $connection->executeStatement(
+            'RENAME TABLE ' . self::CACHE_TABLE . ' TO ' . self::PREVIOUS_CACHE_TABLE . ', '
+            . self::STAGING_TABLE . ' TO ' . self::CACHE_TABLE
+        );
+
+        try {
+            $connection->executeStatement('DROP TABLE ' . self::PREVIOUS_CACHE_TABLE);
+        } catch(Throwable $cleanupException) {
+            echo 'The new Qi cache is active, but the previous cache table could not be removed: '
+                . $cleanupException->getMessage() . PHP_EOL;
+        }
+    }
+
+    private function retrieveObjectsPage(
+        string $url,
+        int $maxAttempts = self::MAX_PAGE_RETRIEVAL_ATTEMPTS
+    ): object
+    {
+        $lastError = 'unknown error';
+
+        for($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $objectsJson = $this->get($url);
+            if($objectsJson === false) {
+                $lastError = 'HTTP request failed';
+            } else {
+                try {
+                    $objectsPage = json_decode($objectsJson, false, 512, JSON_THROW_ON_ERROR);
+                } catch(JsonException $exception) {
+                    $lastError = $exception->getMessage();
+                    echo 'Invalid Qi response: ' . $lastError . PHP_EOL;
+                    $objectsPage = null;
+                }
+
+                if($objectsPage !== null) {
+                    $this->validateObjectsPageStructure($objectsPage);
+                    return $objectsPage;
                 }
             }
+
+            if($attempt < $maxAttempts) {
+                $this->waitBeforeRetry($attempt);
+            }
         }
+
+        throw new RuntimeException(
+            'Could not retrieve a valid Qi page after ' . $maxAttempts
+            . ' attempts (' . $lastError . ').'
+        );
+    }
+
+    private function validateObjectsPageStructure(mixed $objectsPage): void
+    {
+        if(!is_object($objectsPage)) {
+            throw new RuntimeException('The response is not a JSON object.');
+        }
+        if(!property_exists($objectsPage, 'records') || !is_array($objectsPage->records)) {
+            throw new RuntimeException('The response has no records array.');
+        }
+    }
+
+    private function getValidObjectId(mixed $record): ?int
+    {
+        if(!is_object($record) || !isset($record->id) || !is_numeric($record->id) || (int) $record->id <= 0) {
+            return null;
+        }
+        return (int) $record->id;
+    }
+
+    private function registerPageObjectIds(object $objectsPage, array &$seenObjectIds): array
+    {
+        $validObjectIdCount = 0;
+        $newObjectIdCount = 0;
+        foreach($objectsPage->records as $record) {
+            $objectId = $this->getValidObjectId($record);
+            if($objectId === null) {
+                continue;
+            }
+
+            $validObjectIdCount++;
+            if(!array_key_exists($objectId, $seenObjectIds)) {
+                $seenObjectIds[$objectId] = true;
+                $newObjectIdCount++;
+            }
+        }
+        return [
+            'valid' => $validObjectIdCount,
+            'new' => $newObjectIdCount
+        ];
+    }
+
+    private function waitBeforeNextRequest(): void
+    {
+        echo 'Sleeping before the next Qi page' . PHP_EOL;
+        sleep(self::PAGE_DELAY_SECONDS);
+    }
+
+    private function waitBeforeRetry(int $attempt): void
+    {
+        $delay = min(self::RETRY_DELAY_SECONDS * (2 ** ($attempt - 1)), self::PAGE_DELAY_SECONDS);
+        echo 'Retrying the Qi request in ' . $delay . ' seconds' . PHP_EOL;
+        sleep($delay);
     }
 
     private function loadCachedObjects(): void
     {
         // Use DBAL instead of Doctrine ORM here to avoid keeping all QiObject entities managed in memory.
-        $result = $this->entityManager->getConnection()->executeQuery('SELECT metadata FROM qi_object');
+        $result = $this->entityManager->getConnection()->executeQuery('SELECT metadata FROM ' . self::CACHE_TABLE);
+        $invalidJsonCount = 0;
+        $invalidObjectIdCount = 0;
+        $firstJsonError = null;
         foreach($result->iterateAssociative() as $qiObject) {
-            $this->extractRecord(json_decode($qiObject['metadata']));
+            try {
+                $record = json_decode($qiObject['metadata'], false, 512, JSON_THROW_ON_ERROR);
+            } catch(JsonException $exception) {
+                if($firstJsonError === null) {
+                    $firstJsonError = $exception->getMessage();
+                }
+                $invalidJsonCount++;
+                continue;
+            }
+
+            $objectId = $this->getValidObjectId($record);
+            if($objectId === null) {
+                $invalidObjectIdCount++;
+                continue;
+            }
+            $record->id = $objectId;
+            $this->extractRecord($record);
         }
         $result->free();
+        if($invalidJsonCount > 0) {
+            echo 'Skipped ' . $invalidJsonCount . ' cached Qi objects with invalid JSON. First error: '
+                . $firstJsonError . PHP_EOL;
+        }
+        if($invalidObjectIdCount > 0) {
+            echo 'Skipped ' . $invalidObjectIdCount . ' cached Qi objects without a valid object ID.' . PHP_EOL;
+        }
     }
 
-    private function storeObjects($objsJson, bool $indexObjects = true): int
+    private function storeObjects(object $objectsPage, bool $indexObjects = true): void
     {
-        $objs = json_decode($objsJson);
-        $records = $objs->records;
-        $count = $objs->count;
-        foreach($records as $record) {
+        $skippedRecordCount = 0;
+        foreach($objectsPage->records as $record) {
+            $objectId = $this->getValidObjectId($record);
+            if($objectId === null) {
+                $skippedRecordCount++;
+                continue;
+            }
+            $record->id = $objectId;
+
             if($indexObjects) {
                 $this->extractRecord($record);
             }
             if($this->fullProcessing) {
-                $this->storeCachedObject($record);
+                $this->storeStagedObject($record);
             }
         }
-        return $count;
+        if($skippedRecordCount > 0) {
+            echo 'Skipped ' . $skippedRecordCount . ' Qi records without a valid object ID.' . PHP_EOL;
+        }
     }
 
     private function extractRecord($record): void
     {
-        if(!$this->onlyOnlineRecords || $record->online === '1') {
+        if(!$this->onlyOnlineRecords || (string) ($record->online ?? '') === '1') {
             $this->objectsByObjectId[intval($record->id)] = $record;
             if(!empty($record->object_number)) {
                 $this->objectsByInventoryNumber[$record->object_number] = $record;
@@ -185,24 +384,38 @@ class Qi
         }
     }
 
-    private function storeCachedObject($record): void
+    private function storeStagedObject($record): void
     {
-        $this->ping();
+        $sql = 'INSERT INTO ' . self::STAGING_TABLE . ' (object_id, metadata) '
+            . 'VALUES (:object_id, :metadata) '
+            . 'ON DUPLICATE KEY UPDATE metadata = VALUES(metadata)';
+        $parameters = [
+            'object_id' => intval($record->id),
+            'metadata' => json_encode($record, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE)
+        ];
+        $connection = $this->entityManager->getConnection();
 
-        //Store in MySQL for faster processing in the next cycles
-        $qiObject = new QiObject();
-        $qiObject->setObjectId(intval($record->id));
-        $qiObject->setMetadata(json_encode($record));
-        $this->entityManager->persist($qiObject);
-        $this->entityManager->flush();
-        $this->entityManager->detach($qiObject);
+        try {
+            $connection->executeStatement($sql, $parameters);
+        } catch(Throwable $exception) {
+            // Retrying is safe because the upsert is idempotent. This also recovers from an idle MySQL connection.
+            echo 'Database write failed; reconnecting and retrying: ' . $exception->getMessage() . PHP_EOL;
+            $connection->close();
+            $connection->executeStatement($sql, $parameters);
+        }
     }
 
     private function ping(): void
     {
         $connection = $this->entityManager->getConnection();
-        if (!$connection->isConnected()) {
-            $connection->getNativeConnection();
+        try {
+            $result = $connection->executeQuery('SELECT 1');
+            $result->free();
+        } catch(Throwable $exception) {
+            echo 'Database ping failed; reconnecting: ' . $exception->getMessage() . PHP_EOL;
+            $connection->close();
+            $result = $connection->executeQuery('SELECT 1');
+            $result->free();
         }
     }
 
