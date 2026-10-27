@@ -245,12 +245,13 @@ class ProcessCommand extends Command
                     if (empty($inventoryNumber)) {
                         continue;
                     }
-                    if (!array_key_exists($inventoryNumber, $this->objectsByInventoryNumber)) {
+                    $inventoryNumberKey = strtolower($inventoryNumber);
+                    if (!array_key_exists($inventoryNumberKey, $this->objectsByInventoryNumber)) {
                         echo 'Skipping resource ' . $resourceId . ' as there are no objects with this inventory number.' . PHP_EOL;
                         continue;
                     }
 
-                    $object = $this->objectsByInventoryNumber[$inventoryNumber];
+                    $object = $this->objectsByInventoryNumber[$inventoryNumberKey];
                     $key = $this->resourceKey($resourceId, (int) $object->id);
                     if (array_key_exists($key, $this->linkedResources)) {
                         echo 'Skipping resource ' . $resourceId . ' as it is already linked in Qi.' . PHP_EOL;
@@ -568,10 +569,11 @@ class ProcessCommand extends Command
                             if (!$forbiddenFilename) {
                                 $resourceId = intval($resource['ref']);
                                 $this->resourcesByResourceId[$resourceId] = $resource;
-                                if (!array_key_exists($inventoryNumber, $this->resourcesByInventoryNumber)) {
-                                    $this->resourcesByInventoryNumber[$inventoryNumber] = [];
+                                $inventoryNumberKey = strtolower($inventoryNumber);
+                                if (!array_key_exists($inventoryNumberKey, $this->resourcesByInventoryNumber)) {
+                                    $this->resourcesByInventoryNumber[$inventoryNumberKey] = [];
                                 }
-                                $this->resourcesByInventoryNumber[$inventoryNumber][] = $resource;
+                                $this->resourcesByInventoryNumber[$inventoryNumberKey][] = $resource;
 
                                 // Sort the resources based on the postfix in their filename (_01, _01_ret, _01_det1, _01_retouche, _02, ..., _M01, _M02, ...)
                                 $ending = "9999999999999999999";
@@ -582,13 +584,13 @@ class ProcessCommand extends Command
                                 } else if(preg_match('/^.*_M?[0-9]+$/', $filenameWithoutExtension)) {
                                     $ending = preg_replace('/^.*_(M?[0-9]+)$/', '$1', $filenameWithoutExtension);
                                 }
-                                if(!array_key_exists($inventoryNumber, $tmpResourcesByFilename)) {
-                                    $tmpResourcesByFilename[$inventoryNumber] = [];
+                                if(!array_key_exists($inventoryNumberKey, $tmpResourcesByFilename)) {
+                                    $tmpResourcesByFilename[$inventoryNumberKey] = [];
                                 }
-                                if(!array_key_exists($ending, $tmpResourcesByFilename[$inventoryNumber])) {
-                                    $tmpResourcesByFilename[$inventoryNumber][$ending] = [];
+                                if(!array_key_exists($ending, $tmpResourcesByFilename[$inventoryNumberKey])) {
+                                    $tmpResourcesByFilename[$inventoryNumberKey][$ending] = [];
                                 }
-                                $tmpResourcesByFilename[$inventoryNumber][$ending][$resourceId] = $resource;
+                                $tmpResourcesByFilename[$inventoryNumberKey][$ending][$resourceId] = $resource;
                             } else {
                                 echo 'Resource ' . $resource['ref'] . ' has forbidden filename (' . $filenameWithoutExtension . ')' . PHP_EOL;
                             }

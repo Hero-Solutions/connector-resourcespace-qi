@@ -233,6 +233,22 @@ namespace {
         }
         return $record;
     }
+    function inventoryContext(string $rsNumber, array $records, array $active = [], array $images = []): array
+    {
+        $objectId = (int) $records[0]->id;
+        $context = context($active, [], $images, $objectId);
+        $db = new FixtureConnection();
+        foreach ($records as $record) { $db->cache[(int) $record->id] = $record; }
+        $qi = realQi($db, new HttpUtil());
+        $context['matchingLog'] = capture(fn() => $qi->retrieveAllObjects('1 week'));
+        setValue($context['command'], 'objectsByObjectId', $qi->getObjectsByObjectId());
+        setValue($context['command'], 'objectsByInventoryNumber', $qi->getObjectsByInventoryNumber());
+        $resource = ['ref'=>196614, 'inventory_number'=>$rsNumber, 'original_filename'=>'fixture.jpg'];
+        setValue($context['command'], 'resourcesByFilename', ['fixture'=>['01'=>[196614=>$resource]]]);
+        setValue($context['command'], 'resourcesByResourceId', [196614=>$resource]);
+        setValue($context['command'], 'update', false);
+        return $context;
+    }
     function test(string $name, callable $action): void
     {
         $action();
@@ -372,5 +388,66 @@ namespace {
         capture(fn() => realQi($db,$http)->retrieveAllObjects('1 week'));
         check($db->closes === 1 && isset($db->cache[13720]), 'Cache retry did not recover');
     });
-    echo 'All 17 offline regression tests passed.' . PHP_EOL;
+    test('Inventory matching ignores case for every prefix and preserves source spelling', function () {
+        foreach ([['s2022/9','S2022/9'],['DMK08/02a','DMK08/02A'],['DMK10/02D','DMK10/02d'],
+                  ['tb2024/140','TB2024/140'],['p75/5','P75/5']] as [$rsNumber,$qiNumber]) {
+            $c = inventoryContext($rsNumber, [(object)['id'=>13720,'object_number'=>$qiNumber]]);
+            $output = cycle($c);
+            check($c['rs']->imageRequests === [196614] && str_contains($output,'Uploading resource'), 'Case-only match failed: ' . $rsNumber);
+            check(value($c['command'],'resourcesByResourceId')[196614]['inventory_number'] === $rsNumber, 'RS spelling was changed');
+            check(value($c['command'],'objectsByObjectId')[13720]->object_number === $qiNumber, 'Qi spelling was changed');
+        }
+    });
+    test('Case-only matching keeps an existing RS link without creating another copy', function () {
+        $c = inventoryContext('S1646A', [(object)['id'=>13720,'object_number'=>'S1646a']], [resource()], [image(5916,196614)]);
+        cycle($c);
+        check($c['rs']->imageRequests === [], 'Case-only match duplicated an existing image');
+        check(count($c['qi']->metadataWrites) === 1 && !$c['qi']->metadataWrites[0]['addLink'], 'Existing link was not used');
+    });
+    test('Resources with case variants share one sorted inventory group', function () {
+        $c = context();
+        setValue($c['command'],'debug',false);
+        setValue($c['command'],'rsFields', ['linkwithcms'=>'link','originalfilename'=>'filename',
+            'inventorynumber'=>'inventory','fileextension'=>'extension','filetype'=>'type']);
+        $resources = [
+            ['ref'=>1,'link'=>'yes','filename'=>'photo_02.jpg','inventory'=>'DMK10/02D','extension'=>'jpg','type'=>'image'],
+            ['ref'=>2,'link'=>'yes','filename'=>'photo_01.jpg','inventory'=>'dmk10/02d','extension'=>'jpg','type'=>'image']
+        ];
+        call($c['command'],'storeResources',$resources,['yes'=>'yes'],['jpg'],[],[],[]);
+        $groups = value($c['command'],'resourcesByInventoryNumber');
+        $files = value($c['command'],'resourcesByFilename');
+        check(count($groups) === 1 && count($groups['dmk10/02d']) === 2, 'Case variants formed separate groups');
+        check(array_keys($files['dmk10/02d']) === ['01','02'], 'Cross-case image ordering was lost');
+        check(value($c['command'],'resourcesByResourceId')[1]['inventory'] === 'DMK10/02D', 'Source resource was lowercased');
+    });
+    test('Different Qi objects with case-only conflicting numbers are not matched arbitrarily', function () {
+        $c = inventoryContext('S1646A', [(object)['id'=>13720,'object_number'=>'S1646A'],
+                                      (object)['id'=>13721,'object_number'=>'s1646a']]);
+        cycle($c);
+        check($c['rs']->imageRequests === [] && $c['qi']->metadataWrites === [], 'Ambiguous inventory number was matched');
+        check(str_contains($c['matchingLog'],'differing only by case'), 'Missing ambiguity warning');
+        check(!isset(value($c['command'],'objectsByInventoryNumber')['s1646a']), 'Ambiguous lookup remained enabled');
+    });
+    test('A case change on the same Qi object is not considered a collision', function () {
+        $db = new FixtureConnection(); $http = new HttpUtil();
+        $db->cache[13720] = (object)['id'=>13720,'object_number'=>'s2022/9'];
+        $http->delta = [(object)['id'=>13720,'object_number'=>'S2022/9']];
+        $qi = realQi($db,$http);
+        $output = capture(fn()=>$qi->retrieveAllObjects('1 week'));
+        check($qi->getObjectsByInventoryNumber()['s2022/9']->id === 13720, 'Same-object case change blocked matching');
+        check($db->cache[13720]->object_number === 'S2022/9', 'Updated Qi spelling was not preserved');
+        check(!str_contains($output,'differing only by case'), 'Same object produced an ambiguity warning');
+    });
+    test('Comma-separated inventory numbers do not enable multi-object linking', function () {
+        $c = inventoryContext('TB2024/140, TB2024/141', [(object)['id'=>13720,'object_number'=>'TB2024/140'],
+                                                       (object)['id'=>13721,'object_number'=>'TB2024/141']]);
+        cycle($c);
+        check($c['rs']->imageRequests === [] && $c['qi']->metadataWrites === [], 'Comma list was split into object links');
+    });
+    test('Punctuation in inventory numbers remains significant', function () {
+        $c = inventoryContext('DMK08/02a', [(object)['id'=>13720,'object_number'=>'DMK08/02-a']]);
+        cycle($c);
+        check($c['rs']->imageRequests === [], 'Matching ignored punctuation');
+    });
+    echo 'All 24 offline regression tests passed.' . PHP_EOL;
 }

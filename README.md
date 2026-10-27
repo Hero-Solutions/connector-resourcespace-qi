@@ -57,6 +57,12 @@ Only the full run moves, from Sunday 18:10 to Sunday 06:10. Successful full runs
 
 The five-minute FTP-folder job can retain its existing schedule. It moves queued files and is separate from `app:process`. Moving the full run avoids the deterministic start collision, but does not fix Qi HTTP failures: the full attempt on 18 October 2026 failed after three HTTP 500 responses. Check that each weekly full run logs `Replacing the Qi cache` and completes successfully. If it fails, an operator should arrange a separate retry outside the partial window rather than waiting another week or starting repeated overlapping retries.
 
+## Inventory-number matching
+
+ResourceSpace inventory numbers and Qi object numbers are compared without distinguishing uppercase and lowercase A-Z, for every prefix (for example `S`, `DMK`, `TB` and `P`). Only internal lookup and grouping keys are lowercased; source values retain their spelling. Existing metadata synchronization and exclusion rules keep their existing behavior.
+
+If two different Qi objects have numbers that differ only in letter case, automatic matching for that number is skipped with a warning rather than choosing an arbitrary object. Comma-separated values are still treated as one value; this change does not add multi-object linking or alter the existing import-history policy.
+
 ## Import safety
 
 A ResourceSpace resource that was successfully linked to a Qi object is never automatically imported or linked again to that same object. The identity is the pair of ResourceSpace resource ID and Qi object ID, not the individual Qi media ID.

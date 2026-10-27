@@ -42,6 +42,7 @@ class Qi
 
     private array $objectsByObjectId;
     private array $objectsByInventoryNumber;
+    private array $ambiguousInventoryNumbers = [];
 
     public function __construct($entityManager, $qi, $creditConfig, $test, $debug, $update, $fullProcessing, $onlyOnlineRecords, $httpUtil, $maxFieldValueLength)
     {
@@ -79,6 +80,7 @@ class Qi
     {
         $this->objectsByObjectId = [];
         $this->objectsByInventoryNumber = [];
+        $this->ambiguousInventoryNumbers = [];
 
         try {
             if($this->fullProcessing) {
@@ -375,7 +377,19 @@ class Qi
         if(!$this->onlyOnlineRecords || (string) ($record->online ?? '') === '1') {
             $this->objectsByObjectId[intval($record->id)] = $record;
             if(!empty($record->object_number)) {
-                $this->objectsByInventoryNumber[$record->object_number] = $record;
+                $key = strtolower($record->object_number);
+                $existing = $this->objectsByInventoryNumber[$key] ?? null;
+                if($existing !== null && (int) $existing->id !== (int) $record->id
+                    && $existing->object_number !== $record->object_number) {
+                    $this->ambiguousInventoryNumbers[$key] = true;
+                    unset($this->objectsByInventoryNumber[$key]);
+                    echo 'WARNING: Qi objects ' . $existing->id . ' and ' . $record->id
+                        . ' have inventory numbers differing only by case (' . $existing->object_number
+                        . ' / ' . $record->object_number . '); automatic inventory matching skipped.' . PHP_EOL;
+                }
+                if(!isset($this->ambiguousInventoryNumbers[$key])) {
+                    $this->objectsByInventoryNumber[$key] = $record;
+                }
             } else {
                 echo 'Error: Qi record ' . $record->id . ' has no inventory number' . PHP_EOL;
             }
