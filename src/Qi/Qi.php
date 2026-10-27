@@ -363,9 +363,7 @@ class Qi
             if($indexObjects) {
                 $this->extractRecord($record);
             }
-            if($this->fullProcessing) {
-                $this->storeStagedObject($record);
-            }
+            $this->storeCachedObject($record);
         }
         if($skippedRecordCount > 0) {
             echo 'Skipped ' . $skippedRecordCount . ' Qi records without a valid object ID.' . PHP_EOL;
@@ -384,9 +382,10 @@ class Qi
         }
     }
 
-    private function storeStagedObject($record): void
+    private function storeCachedObject($record): void
     {
-        $sql = 'INSERT INTO ' . self::STAGING_TABLE . ' (object_id, metadata) '
+        $table = $this->fullProcessing ? self::STAGING_TABLE : self::CACHE_TABLE;
+        $sql = 'INSERT INTO ' . $table . ' (object_id, metadata) '
             . 'VALUES (:object_id, :metadata) '
             . 'ON DUPLICATE KEY UPDATE metadata = VALUES(metadata)';
         $parameters = [

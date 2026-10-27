@@ -3,7 +3,6 @@
 namespace App\Command;
 
 use App\Entity\Resource;
-use App\Entity\UnlinkedResource;
 use App\Qi\Qi;
 use App\ResourceSpace\ResourceSpace;
 use App\Util\HttpUtil;
@@ -54,6 +53,7 @@ class ProcessCommand extends Command
     private array $linkedResources;
     /* @var $importedResources Resource[] */
     private array $importedResources;
+    private array $previouslyLinkedResources = [];
 
     private HttpUtil $httpUtil;
     private string $qiReindexUrl;
@@ -159,17 +159,7 @@ class ProcessCommand extends Command
 //            ->setParameter('oneMonthAgo', $oneMonthAgo)
             ->getQuery()
             ->getResult();
-        $this->importedResources = [];
-        $indexedObjects = [];
-        foreach($importedResourcesObjects as $importedResource) {
-            $this->importedResources[$importedResource->getResourceId()] = $importedResource;
-            if($importedResource->getLinked() === 0 && !array_key_exists($importedResource->getObjectId(), $indexedObjects)) {
-                if($this->update) {
-                    $this->httpUtil->get($this->qiReindexUrl . $importedResource->getObjectId());
-                    $indexedObjects[$importedResource->getObjectId()] = $importedResource->getObjectId();
-                }
-            }
-        }
+        $this->initializeImportTracking($importedResourcesObjects);
 
         $this->resourceSpace = new ResourceSpace($rsConfig['api'], $this->httpUtil);
         $allResources = $this->resourceSpace->getAllResources(urlencode($rsConfig['search_query']));
@@ -189,8 +179,8 @@ class ProcessCommand extends Command
 
         $this->linkedResources = [];
 
-        // Remove the links in the database that no longer exist (most likely images that were manually removed from Qi)
-        $this->unlinkDeletedMedia();
+        // Missing Qi data must never erase the history that prevents duplicate imports.
+        $this->reportMissingLinks();
 
         // Add Link DAMS and metadata to images in Qi that were imported in a previous run
         $this->linkImportedResources();
@@ -202,16 +192,55 @@ class ProcessCommand extends Command
         $this->offloadResources();
     }
 
+    private function resourceKey(int $resourceId, int $objectId): string
+    {
+        return $resourceId . ':' . $objectId;
+    }
+
+    /** @param Resource[] $importedResourcesObjects */
+    private function initializeImportTracking(array $importedResourcesObjects): void
+    {
+        $this->importedResources = [];
+        $this->loadPreviouslyLinkedResources();
+        foreach($importedResourcesObjects as $importedResource) {
+            $key = $this->resourceKey($importedResource->getResourceId(), $importedResource->getObjectId());
+            $this->importedResources[$key] = $importedResource;
+            if($importedResource->getLinked() > 0) {
+                $this->previouslyLinkedResources[$key] = true;
+            }
+        }
+
+        $indexedObjects = [];
+        $twoWeeksAgo = new DateTime('-2 weeks');
+        foreach($this->importedResources as $key => $importedResource) {
+            if($importedResource->getLinked() === 0 && $importedResource->getImportTimestamp() >= $twoWeeksAgo
+                && !isset($this->previouslyLinkedResources[$key])
+                && !array_key_exists($importedResource->getObjectId(), $indexedObjects)) {
+                if($this->update) {
+                    $this->httpUtil->get($this->qiReindexUrl . $importedResource->getObjectId());
+                    $indexedObjects[$importedResource->getObjectId()] = true;
+                }
+            }
+        }
+    }
+
+    private function loadPreviouslyLinkedResources(): void
+    {
+        $this->previouslyLinkedResources = [];
+        $result = $this->entityManager->getConnection()->executeQuery(
+            'SELECT DISTINCT resource_id, object_id FROM unlinked_resource WHERE linked > 0'
+        );
+        foreach($result->iterateAssociative() as $row) {
+            $this->previouslyLinkedResources[$this->resourceKey((int) $row['resource_id'], (int) $row['object_id'])] = true;
+        }
+        $result->free();
+    }
+
     private function offloadResources(): void
     {
         foreach ($this->resourcesByFilename as $invNr => $resourcesByEnding) {
             foreach($resourcesByEnding as $ending => $resources) {
                 foreach ($resources as $resourceId => $resource) {
-                    // Skip resources that are already linked to an object in Qi
-                    if (array_key_exists($resourceId, $this->linkedResources)) {
-                        echo 'Skipping resource ' . $resourceId . ' as it is already linked in Qi.' . PHP_EOL;
-                        continue;
-                    }
                     $inventoryNumber = trim($resource[$this->rsFields['inventorynumber']]);
                     if (empty($inventoryNumber)) {
                         continue;
@@ -222,19 +251,28 @@ class ProcessCommand extends Command
                     }
 
                     $object = $this->objectsByInventoryNumber[$inventoryNumber];
+                    $key = $this->resourceKey($resourceId, (int) $object->id);
+                    if (array_key_exists($key, $this->linkedResources)) {
+                        echo 'Skipping resource ' . $resourceId . ' as it is already linked in Qi.' . PHP_EOL;
+                        continue;
+                    }
                     $rsFilename = $resource[$this->rsFields['originalfilename']];
                     $hasMatchingImage = false;
 
-                    $resourceIsLinked = false;
-                    if (array_key_exists($resourceId, $this->importedResources)) {
-                        $resourceIsLinked = true;
-                    }
+                    // The active registration also reserves pending imports. Successful
+                    // history additionally blocks reimport and filename-based relinking.
+                    $resourceIsLinked = isset($this->importedResources[$key]) || isset($this->previouslyLinkedResources[$key]);
 
                     foreach ($this->qiImages[$object->id] as $id => $image) {
                         if ($this->qi->hasLinkDams($image)) {
                             //Update metadata for images that were automatically imported from ResourceSpace to Qi
                             if ($image['link_dams'] === $this->qiLinkDamsPrefix . $resourceId) {
                                 $hasMatchingImage = true;
+                                if(!$resourceIsLinked && $this->update) {
+                                    // Preserve an existing RS link even if its old registration is absent.
+                                    $this->linkManuallyImportedImage($object, $inventoryNumber, $image, $resourceId);
+                                    $resourceIsLinked = true;
+                                }
                                 $this->qi->updateMetadata($image, $resource, $this->rsFields, $this->qiImportMapping, $this->qiLinkDamsPrefix,
                                     false, $this->qiReindexUrl . $object->id);
                             }
@@ -264,6 +302,9 @@ class ProcessCommand extends Command
                         $this->qi->updateResourceSpaceData($object, $resource, $resourceId, $this->rsFields, $this->rsImportMapping, $this->rsFullDataFields, $this->qiUrl, $this->resourceSpace);
                     } else if (!$resourceIsLinked) {
                         $this->checkAndUploadImage($object, $inventoryNumber, $resource, $resourceId);
+                    } else if (isset($this->previouslyLinkedResources[$key]) && !isset($this->importedResources[$key])) {
+                        echo 'WARNING: Resource ' . $resourceId . ' was previously linked to object ' . $object->id
+                            . '; automatic import and relinking are blocked. Manual review required.' . PHP_EOL;
                     }
                 }
             }
@@ -272,6 +313,12 @@ class ProcessCommand extends Command
 
     private function checkAndUploadImage($object, $inventoryNumber, $resource, $resourceId): void
     {
+        $key = $this->resourceKey($resourceId, (int) $object->id);
+        if (isset($this->importedResources[$key]) || isset($this->previouslyLinkedResources[$key])) {
+            echo 'Skipping resource ' . $resourceId . ' for object ' . $object->id
+                . ' because it already has an import registration or successful link history.' . PHP_EOL;
+            return;
+        }
         echo 'Checking if resource ' . $resourceId . ' is to be uploaded to object ' . $object->id . ' (inventory number ' . $inventoryNumber . ')' . PHP_EOL;
         $allImages = $this->resourceSpace->getAllImages($resourceId);
         foreach ($this->fileSizes as $fileSize) {
@@ -333,7 +380,7 @@ class ProcessCommand extends Command
                             $resourceObject->setFilesize(filesize($path));
                             $resourceObject->setLinked(0);
                             $this->entityManager->persist($resourceObject);
-                            $this->importedResources[$resourceId] = $resourceObject;
+                            $this->importedResources[$key] = $resourceObject;
                             $this->entityManager->flush();
 
                             $this->qi->updateResourceSpaceData($object, $resource, $resourceId, $this->rsFields, $this->rsImportMapping, $this->rsFullDataFields, $this->qiUrl, $this->resourceSpace);
@@ -357,6 +404,10 @@ class ProcessCommand extends Command
         $resourceObject->setResourceId($resourceId);
         $resourceObject->setObjectId($object->id);
         $resourceObject->setInventoryNumber($inventoryNumber);
+        $resourceObject->setOriginalFilename('');
+        $resourceObject->setWidth(0);
+        $resourceObject->setHeight(0);
+        $resourceObject->setFilesize(0);
         if (array_key_exists('original_filename', $image)) {
             if (!empty($image['original_filename'])) {
                 $resourceObject->setOriginalFilename($image['original_filename']);
@@ -381,7 +432,9 @@ class ProcessCommand extends Command
         $this->entityManager->persist($resourceObject);
         $this->entityManager->flush();
 
-        $this->importedResources[$resourceId] = $resourceObject;
+        $key = $this->resourceKey($resourceId, (int) $object->id);
+        $this->importedResources[$key] = $resourceObject;
+        $this->previouslyLinkedResources[$key] = true;
     }
 
     private function filenamesMatch($resourceId, $rsFilename, $qiFilename): bool
@@ -558,9 +611,9 @@ class ProcessCommand extends Command
         }
     }
 
-    private function unlinkDeletedMedia(): void
+    private function reportMissingLinks(): void
     {
-        foreach($this->importedResources as $resourceId => $ir) {
+        foreach($this->importedResources as $ir) {
             if($ir->getLinked() > 0) {
                 //TODO what if the object is gone from Qi?
                 if(array_key_exists($ir->getObjectId(), $this->objectsByObjectId)) {
@@ -575,39 +628,26 @@ class ProcessCommand extends Command
                         }
                     }
                     if(!$linked) {
-                        $this->unlinkResource($ir);
+                        echo 'WARNING: No RS link found for resource ' . $ir->getResourceId() . ' on object ' . $ir->getObjectId()
+                            . '; keeping its successful import registration. No automatic reimport or relinking.' . PHP_EOL;
                     }
                 }
             }
         }
     }
 
-    private function unlinkResource($ir): void
-    {
-        echo 'Unlink resource ' . $ir->getResourceId() . ' from object ' . $ir->getObjectId() . ' (inv. ' . $ir->getInventoryNumber() . ')' . PHP_EOL;
-        unset($this->importedResources[$ir->getResourceId()]);
-        if($this->update) {
-            $unlinkedResource = new UnlinkedResource();
-            $unlinkedResource->setImportTimestamp($ir->getImportTimestamp());
-            $unlinkedResource->setResourceId($ir->getResourceId());
-            $unlinkedResource->setObjectId($ir->getObjectId());
-            $unlinkedResource->setInventoryNumber($ir->getInventoryNumber());
-            $unlinkedResource->setOriginalFilename($ir->getOriginalFilename());
-            $unlinkedResource->setWidth($ir->getWidth());
-            $unlinkedResource->setHeight($ir->getHeight());
-            $unlinkedResource->setFilesize($ir->getFilesize());
-            $unlinkedResource->setLinked($ir->getLinked());
-            $this->entityManager->persist($unlinkedResource);
-            $this->entityManager->flush();
-            $this->entityManager->remove($ir);
-            $this->entityManager->flush();
-        }
-    }
-
     private function linkImportedResources(): void
     {
+        $twoWeeksAgo = new DateTime('-2 weeks');
         foreach($this->importedResources as $ir) {
             if($ir->getLinked() === 0) {
+                $key = $this->resourceKey($ir->getResourceId(), $ir->getObjectId());
+                if(isset($this->previouslyLinkedResources[$key]) || $ir->getImportTimestamp() < $twoWeeksAgo) {
+                    echo 'WARNING: Pending import for resource ' . $ir->getResourceId() . ' on object ' . $ir->getObjectId()
+                        . ' requires manual review (successful link history or import older than two weeks).'
+                        . ' Registration retained; no automatic reimport or relinking.' . PHP_EOL;
+                    continue;
+                }
                 if(array_key_exists($ir->getResourceId(), $this->resourcesByResourceId) && array_key_exists($ir->getObjectId(), $this->objectsByObjectId)) {
                     $images = $this->qiImages[$ir->getObjectId()];
                     $resource = $this->resourcesByResourceId[$ir->getResourceId()];
@@ -618,21 +658,14 @@ class ProcessCommand extends Command
                             $ir->setLinked(1);
                             $this->entityManager->persist($ir);
                             $this->entityManager->flush();
+                            $this->previouslyLinkedResources[$key] = true;
                         }
-                        $this->linkedResources[$ir->getResourceId()] = $ir->getResourceId();
+                        $this->linkedResources[$key] = true;
                     } else {
                         echo 'ERROR: No matching image found for resource ' . $ir->getResourceId() . ' with object ' . $ir->getObjectId() . ' (inventory number ' . $ir->getInventoryNumber() . ')' . PHP_EOL;
-                        //If problem persists for 2 weeks, automatically mark the resource as unlinked
-                        if($ir->getImportTimestamp() < new DateTime('-2 weeks')) {
-                            $this->unlinkResource($ir);
-                        }
                     }
                 } else {
                     echo 'ERROR: No match found for resource ' . $ir->getResourceId() . ' with object ' . $ir->getObjectId() . ' (inventory number ' . $ir->getInventoryNumber() . ')' . PHP_EOL;
-                    //If problem persists for 2 weeks, automatically mark the resource as unlinked
-                    if($ir->getImportTimestamp() < new DateTime('-2 weeks')) {
-                        $this->unlinkResource($ir);
-                    }
                 }
             }
         }
