@@ -48,10 +48,14 @@ namespace App\Util {
         public array $requests = [];
         public array $delta = [];
         public array $objects = [];
-        public function get($url, $username = null, $password = null): string
+        public array $objectResponses = [];
+        public function get($url, $username = null, $password = null): string|bool
         {
             $this->requests[] = $url;
             if (preg_match('~/get/object/id/(\d+)/~', $url, $matches)) {
+                if (array_key_exists((int) $matches[1], $this->objectResponses)) {
+                    return $this->objectResponses[(int) $matches[1]];
+                }
                 $records = isset($this->objects[(int) $matches[1]]) ? [$this->objects[(int) $matches[1]]] : [];
             } else {
                 $records = $this->delta;
@@ -122,7 +126,10 @@ namespace {
         public array $metadataWrites = [];
         public int $rsMetadataUpdates = 0;
         public int $matchingAttempts = 0;
-        public function __construct() {}
+        public function __construct(...$arguments)
+        {
+            if ($arguments !== []) { parent::__construct(...$arguments); }
+        }
         public function updateMetadata($image, $resource, $fields, $mapping, $prefix, $addLink, $reindex): void
         {
             $this->metadataWrites[] = ['id' => $image['id'], 'addLink' => $addLink];
@@ -198,13 +205,13 @@ namespace {
             $rsData[$id] = ['ref' => $id, 'inventory_number' => 'fixture', 'original_filename' => 'fixture.jpg'];
         }
         foreach ([
-            'entityManager' => $em, 'qi' => $qi, 'resourceSpace' => $rs, 'httpUtil' => $http, 'update' => true,
+            'entityManager' => $em, 'qi' => $qi, 'resourceSpace' => $rs, 'httpUtil' => $http, 'update' => true, 'fullProcessing' => true,
             'objectsByObjectId' => [$object => (object) ['id' => $object]],
             'objectsByInventoryNumber' => ['fixture' => (object) ['id' => $object]],
             'qiImages' => [$object => $images], 'qiLinkDamsPrefix' => 'fixture:rs/',
             'linkedResources' => [], 'resourcesByFilename' => ['fixture' => ['01' => $rsData]],
             'resourcesByResourceId' => $rsData, 'rsFields' => ['inventorynumber' => 'inventory_number', 'originalfilename' => 'original_filename'],
-            'qiImportMapping' => [], 'rsImportMapping' => [], 'rsFullDataFields' => [],
+            'qiImportMapping' => [], 'qiMappingToSelf' => [], 'rsImportMapping' => [], 'rsFullDataFields' => [],
             'qiUrl' => 'fixture:qi/', 'qiReindexUrl' => 'fixture:reindex/', 'fileSizes' => ['scr'], 'qiMediaFolderIds' => [10]
         ] as $property => $val) { setValue($command, $property, $val); }
         call($command, 'initializeImportTracking', $active);
@@ -218,9 +225,9 @@ namespace {
             }
         });
     }
-    function realQi(FixtureConnection $connection, HttpUtil $http, array $resources = [], bool $full = false): Qi
+    function realQi(FixtureConnection $connection, HttpUtil $http, array $resources = [], bool $full = false, string $class = Qi::class): Qi
     {
-        return new Qi(new EntityManager($connection, $resources),
+        return new $class(new EntityManager($connection, $resources),
             ['api' => ['url' => 'https://offline.invalid/api', 'username' => 'fake', 'password' => 'fake'], 'get_fields' => 'fixture'],
             ['qi_field_prefix' => 'credits', 'languages' => []], false, false, true, $full, false, $http, 1000);
     }
@@ -251,8 +258,40 @@ namespace {
     }
     function test(string $name, callable $action): void
     {
+        static $count = 0;
         $action();
+        $GLOBALS['passedTests'] = ++$count;
         echo 'PASS ' . $name . PHP_EOL;
+    }
+
+    function mediaRecord(array $images = [], string $number = 'fixture', string $online = '1'): object
+    {
+        $record = (object) ['id'=>13720, 'object_number'=>$number, 'online'=>$online];
+        if ($images !== []) {
+            foreach (array_keys($images[0]) as $field) {
+                $record->{'media.image.' . $field} = array_column($images, $field);
+            }
+        }
+        return $record;
+    }
+    function partialContext(HttpUtil $http, array $images = [], array $active = [], array $rsIds = [196614], array $archives = []): array
+    {
+        $c = context($active, $archives, $images, 13720, $rsIds);
+        $c['connection']->cache[13720] = mediaRecord($images);
+        $qi = realQi($c['connection'], $http, $active, false, FixtureQi::class);
+        capture(fn() => $qi->retrieveAllObjects('1 week'));
+        foreach (['qi'=>$qi, 'httpUtil'=>$http, 'fullProcessing'=>false, 'update'=>false,
+                  'objectsByObjectId'=>$qi->getObjectsByObjectId(),
+                  'objectsByInventoryNumber'=>$qi->getObjectsByInventoryNumber()] as $property=>$val) {
+            setValue($c['command'], $property, $val);
+        }
+        $c['qi'] = $qi;
+        $c['http'] = $http;
+        return $c;
+    }
+    function objectRequestCount(HttpUtil $http): int
+    {
+        return count(array_filter($http->requests, fn($url)=>str_contains($url,'/get/object/id/')));
     }
 
     check(ini_get('allow_url_fopen') === '0', 'Run these tests with php -n -d allow_url_fopen=0');
@@ -449,5 +488,143 @@ namespace {
         cycle($c);
         check($c['rs']->imageRequests === [], 'Matching ignored punctuation');
     });
-    echo 'All 24 offline regression tests passed.' . PHP_EOL;
+    test('Partial imports refresh a cached object only once for multiple new resources', function () {
+        $http = new HttpUtil(); $http->objects[13720] = mediaRecord();
+        $c = partialContext($http, rsIds:[196614,196615]);
+        cycle($c);
+        check(objectRequestCount($http) === 1, 'A cache hit counted as fresh or the object was fetched repeatedly');
+        check($c['rs']->imageRequests === [196614,196615], 'Freshly checked new imports were blocked');
+        check(count($c['connection']->writes) === 1, 'The fresh object was not cached once');
+    });
+    test('A fresh RS link replaces stale images and prevents another upload', function () {
+        $http = new HttpUtil(); $http->objects[13720] = mediaRecord([image(5916,196614)]);
+        $c = partialContext($http);
+        setValue($c['command'], 'update', true);
+        cycle($c);
+        check(objectRequestCount($http) === 1 && $c['rs']->imageRequests === [], 'Fresh existing link was ignored');
+        check(isset(value($c['command'],'qiImages')[13720][5916]), 'Matching used the stale image list');
+        check(isset(value($c['command'],'previouslyLinkedResources')['196614:13720']), 'Observed link was not protected');
+        check(!$c['qi']->metadataWrites[0]['addLink'], 'Existing link was unnecessarily recreated');
+    });
+    test('A refreshed filename match links the existing image instead of uploading', function () {
+        $http = new HttpUtil(); $http->objects[13720] = mediaRecord([image(5916,null,99)]);
+        $c = partialContext($http);
+        setValue($c['command'], 'update', true);
+        cycle($c);
+        check($c['rs']->imageRequests === [] && count($c['qi']->metadataWrites) === 1, 'Fresh filename match was not used');
+        check($c['qi']->metadataWrites[0] === ['id'=>5916,'addLink'=>true], 'Wrong image was linked');
+    });
+    test('Delta results count as fresh even when a recent import also refers to that object', function () {
+        $http = new HttpUtil(); $http->delta = [mediaRecord()]; $http->objectResponses[13720] = false;
+        $c = partialContext($http, active:[resource(196615,age:1)]);
+        cycle($c);
+        check(objectRequestCount($http) === 0 && count($http->requests) === 1, 'A delta object was fetched again');
+        check($c['rs']->imageRequests === [196614], 'Already-fresh object could not receive a new import');
+    });
+    test('Successful recent-import refreshes are reused for another new resource', function () {
+        $http = new HttpUtil(); $http->objects[13720] = mediaRecord();
+        $c = partialContext($http, active:[resource(196615,age:1)]);
+        cycle($c);
+        check(objectRequestCount($http) === 1 && $c['rs']->imageRequests === [196614], 'Recent refresh was repeated or not reused');
+    });
+    test('Failed or invalid checks postpone first links and uploads without repeated requests', function () {
+        foreach ([false,'invalid JSON','{}','{"records":[]}',
+                  '{"records":[{"id":99999,"object_number":"fixture"}]}',
+                  '{"records":[{"id":13720},{"id":13720}]}'] as $response) {
+            $http = new HttpUtil(); $http->objectResponses[13720] = $response;
+            $c = partialContext($http, [image(5916,null,99)], rsIds:[196614,196615]);
+            setValue($c['command'], 'update', true);
+            $output = cycle($c);
+            check(objectRequestCount($http) === 1, 'Failed object was requested repeatedly');
+            check(str_contains($output,'Deferring new links'), 'Missing postponement warning');
+            check($c['qi']->metadataWrites === [] && $c['rs']->imageRequests === [], 'Stale data allowed a link or upload');
+            check($c['em']->persisted === [] && $c['connection']->writes === [], 'Failed retrieval changed registrations or cache');
+        }
+    });
+    test('A failed recent-import refresh cannot finish a pending link using stale images', function () {
+        $http = new HttpUtil(); $http->objectResponses[13720] = false;
+        $pending = resource(linked:0,age:1);
+        $c = partialContext($http, [image(5916)], [$pending]);
+        setValue($c['command'], 'update', true);
+        cycle($c);
+        check(objectRequestCount($http) === 1 && $c['qi']->matchingAttempts === 0, 'A failed recent refresh was retried or ignored');
+        check($pending->getLinked() === 0 && $c['qi']->metadataWrites === [] && $c['rs']->imageRequests === [], 'Pending link used stale images');
+    });
+    test('A successfully refreshed pending first import can still finish without another request', function () {
+        $http = new HttpUtil(); $http->objects[13720] = mediaRecord([image(71709)]);
+        $pending = resource(linked:0,age:1);
+        $c = partialContext($http, active:[$pending]);
+        setValue($c['command'], 'update', true);
+        cycle($c);
+        check(objectRequestCount($http) === 1 && $pending->getLinked() === 1, 'Pending first link did not reuse its fresh object');
+        check($c['rs']->imageRequests === [] && $c['qi']->metadataWrites[0]['addLink'], 'Pending first import was duplicated');
+    });
+    test('Full-run new imports and first filename links make no extra Qi requests', function () {
+        foreach ([[],[image(5916,null,99)]] as $images) {
+            $c = context(images:$images);
+            if ($images === []) { setValue($c['command'],'update',false); }
+            cycle($c);
+            check($c['http']->requests === [], 'Full run made an extra retrieval');
+            check($images === [] ? $c['rs']->imageRequests === [196614] : $c['qi']->metadataWrites[0]['addLink'], 'Full-run import behavior changed');
+        }
+        $http = new HttpUtil(); $qi = realQi(new FixtureConnection(),$http,[],true);
+        check($qi->ensureObjectRetrieved(13720) && $http->requests === [], 'Full Qi retrieval guard made a request');
+    });
+    test('Successful history and observed existing links do not trigger the new partial check', function () {
+        foreach ([[[resource()],[],[]],[[],[archive()],[]],[[],[],[image(5916,196614)]]] as [$active,$archives,$images]) {
+            $http = new HttpUtil(); $http->objectResponses[13720] = false;
+            $c = partialContext($http,$images,$active,archives:$archives);
+            cycle($c);
+            check(objectRequestCount($http) === 0 && $c['rs']->imageRequests === [], 'Protected or existing link caused a new retrieval/import');
+            check(!in_array(true,array_column($c['qi']->metadataWrites,'addLink'),true), 'A successful pair was linked again');
+        }
+    });
+    test('Changed inventory numbers and offline objects do not receive new partial imports', function () {
+        foreach ([mediaRecord(number:'different'),mediaRecord(online:'0')] as $fresh) {
+            $http = new HttpUtil(); $http->objects[13720] = $fresh;
+            $c = partialContext($http);
+            (new ReflectionProperty(Qi::class,'onlyOnlineRecords'))->setValue($c['qi'],true);
+            cycle($c);
+            check(objectRequestCount($http) === 1 && $c['rs']->imageRequests === [], 'Unavailable or changed object received a new import');
+            check(!isset(value($c['command'],'objectsByInventoryNumber')['fixture']), 'Stale inventory lookup survived refresh');
+        }
+    });
+    test('Failed freshness checks are retried in the next partial run, not permanently blocked', function () {
+        $db = new FixtureConnection(); $http = new HttpUtil(); $db->cache[13720] = mediaRecord();
+        $http->objectResponses[13720] = false;
+        $qi = realQi($db,$http);
+        capture(fn()=>$qi->retrieveAllObjects('1 week'));
+        $first = null;
+        capture(function () use ($qi,&$first) { $first=$qi->ensureObjectRetrieved(13720); });
+        check($first === false && !$qi->ensureObjectRetrieved(13720) && objectRequestCount($http) === 1, 'Failed check was not remembered within the run');
+        unset($http->objectResponses[13720]); $http->objects[13720] = mediaRecord();
+        capture(fn()=>$qi->retrieveAllObjects('1 week'));
+        check($qi->ensureObjectRetrieved(13720) && objectRequestCount($http) === 2, 'Failed check blocked a later run');
+    });
+    test('Existing RS links take priority over filename matches regardless of image order', function () {
+        foreach ([[image(71709,null,99),image(5916,196614)],
+                  [image(5916,196614),image(71709,null,99)]] as $images) {
+            $http = new HttpUtil(); $http->objects[13720] = mediaRecord($images);
+            $c = partialContext($http);
+            setValue($c['command'],'update',true);
+            cycle($c);
+            check(objectRequestCount($http) === 1 && $c['rs']->imageRequests === [], 'Existing resource was uploaded again');
+            check($c['qi']->metadataWrites === [['id'=>5916,'addLink'=>false]], 'An unlinked filename match gained a duplicate RS link');
+            check(isset(value($c['command'],'previouslyLinkedResources')['196614:13720']), 'Existing correct link was not protected');
+        }
+    });
+    test('A pending first import recognizes an existing RS link before linking another image', function () {
+        foreach ([[image(71709),image(5916,196614)],
+                  [image(5916,196614),image(71709)]] as $images) {
+            $http = new HttpUtil(); $http->objects[13720] = mediaRecord($images);
+            $pending = resource(linked:0,age:1);
+            $c = partialContext($http,active:[$pending]);
+            setValue($c['command'],'update',true);
+            cycle($c);
+            check(objectRequestCount($http) === 1 && $c['qi']->matchingAttempts === 0, 'Pending import ignored an existing RS link');
+            check($pending->getLinked() === 1 && $c['rs']->imageRequests === [], 'Known existing link did not complete the pending registration');
+            check($c['qi']->metadataWrites === [['id'=>5916,'addLink'=>false]], 'Pending import linked a second image');
+        }
+    });
+    echo 'All ' . $GLOBALS['passedTests'] . ' offline regression tests passed.' . PHP_EOL;
 }

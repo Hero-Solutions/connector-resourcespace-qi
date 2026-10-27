@@ -41,6 +41,8 @@ The database user running the connector therefore needs permission to create, dr
 
 Partial runs also save every freshly retrieved Qi object to `qi_object`. This includes individual object refreshes for recent imports, so their images do not disappear from the local view when the two-week refresh window expires. Full runs continue writing to staging until the complete cache is ready.
 
+Before a partial run creates a first link or queues a new image import, it retrieves the target Qi object if that object has not already been successfully retrieved during the same run. Objects returned by the changed-object query or the recent-import refresh count as retrieved; loading the local cache does not. The refreshed images and inventory-number match are checked before proceeding. An existing RS link always takes priority over filename matches or a pending first import, regardless of image order. Each object is requested at most once individually per run, including failed requests. A failed request, empty or mismatched response, unavailable object or changed inventory match postpones the new link/import until a later run. Full runs make no extra requests for this check. Existing successful link history continues to block reimports.
+
 ## Weekly schedule (operator only)
 
 Do not schedule the full run at the same time as a partial run. Both use the same non-blocking process lock: whichever starts first runs, and the other exits immediately. The supplied schedule started both jobs on Sundays at 18:10.
@@ -74,7 +76,7 @@ A ResourceSpace resource that was successfully linked to a Qi object is never au
 - Pending first imports remain reserved. For up to two weeks the connector can finish their initial link. After that, or when successful history already exists for the pair, it reports manual review instead of reindexing, relinking or automatically uploading another copy.
 - A first import or first filename-based link remains possible for a pair without an active registration or successful history. History on another Qi object does not block a new pair.
 
-This uses the existing tables and does not require a schema migration or additional Qi API requests. Preserve the active registrations and historical archive when cleaning up duplicates. An intentional reimport of a previously linked pair requires a separate, explicit operator action; the connector has no automatic reset.
+This uses the existing tables and does not require a schema migration. The partial-run check above adds a Qi request only for an object that needs a new link/import and has not yet been retrieved during that run. Preserve the active registrations and historical archive when cleaning up duplicates. An intentional reimport of a previously linked pair requires a separate, explicit operator action; the connector has no automatic reset.
 
 ### Applying the change and cleaning up (operator only)
 

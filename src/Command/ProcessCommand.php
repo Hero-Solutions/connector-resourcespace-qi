@@ -264,16 +264,29 @@ class ProcessCommand extends Command
                     // history additionally blocks reimport and filename-based relinking.
                     $resourceIsLinked = isset($this->importedResources[$key]) || isset($this->previouslyLinkedResources[$key]);
 
+                    if(!$resourceIsLinked) {
+                        $existingImage = $this->findResourceLink($this->qiImages[$object->id], $resourceId);
+                        if($existingImage === null) {
+                            $object = $this->getObjectForNewLink($object, $inventoryNumber);
+                            if($object === null) {
+                                continue;
+                            }
+                            $existingImage = $this->findResourceLink($this->qiImages[$object->id], $resourceId);
+                        }
+                        // Check all existing RS links before considering any filename match.
+                        if($existingImage !== null) {
+                            if($this->update) {
+                                $this->linkManuallyImportedImage($object, $inventoryNumber, $existingImage, $resourceId);
+                            }
+                            $resourceIsLinked = true;
+                        }
+                    }
+
                     foreach ($this->qiImages[$object->id] as $id => $image) {
                         if ($this->qi->hasLinkDams($image)) {
                             //Update metadata for images that were automatically imported from ResourceSpace to Qi
                             if ($image['link_dams'] === $this->qiLinkDamsPrefix . $resourceId) {
                                 $hasMatchingImage = true;
-                                if(!$resourceIsLinked && $this->update) {
-                                    // Preserve an existing RS link even if its old registration is absent.
-                                    $this->linkManuallyImportedImage($object, $inventoryNumber, $image, $resourceId);
-                                    $resourceIsLinked = true;
-                                }
                                 $this->qi->updateMetadata($image, $resource, $this->rsFields, $this->qiImportMapping, $this->qiLinkDamsPrefix,
                                     false, $this->qiReindexUrl . $object->id);
                             }
@@ -310,6 +323,41 @@ class ProcessCommand extends Command
                 }
             }
         }
+    }
+
+    private function findResourceLink(array $images, int $resourceId): ?array
+    {
+        foreach($images as $image) {
+            if(($image['link_dams'] ?? null) === $this->qiLinkDamsPrefix . $resourceId) {
+                return $image;
+            }
+        }
+        return null;
+    }
+
+    private function getObjectForNewLink(object $object, string $inventoryNumber): ?object
+    {
+        if($this->fullProcessing) {
+            return $object;
+        }
+        $objectId = (int) $object->id;
+        if(!$this->qi->ensureObjectRetrieved($objectId)) {
+            echo 'WARNING: Deferring new links and imports for object ' . $objectId
+                . '; no successful Qi retrieval in this partial run.' . PHP_EOL;
+            return null;
+        }
+
+        $this->objectsByObjectId = $this->qi->getObjectsByObjectId();
+        $this->objectsByInventoryNumber = $this->qi->getObjectsByInventoryNumber();
+        $freshObject = $this->objectsByObjectId[$objectId] ?? null;
+        $matchingObject = $this->objectsByInventoryNumber[strtolower($inventoryNumber)] ?? null;
+        if($freshObject === null || (int) ($matchingObject->id ?? 0) !== $objectId) {
+            echo 'WARNING: Deferring new links and imports for object ' . $objectId
+                . '; the refreshed object is unavailable or no longer matches inventory number ' . $inventoryNumber . '.' . PHP_EOL;
+            return null;
+        }
+        $this->qiImages[$objectId] = $this->qi->getMediaInfos($freshObject, $this->qiImportMapping, $this->qiMappingToSelf);
+        return $freshObject;
     }
 
     private function checkAndUploadImage($object, $inventoryNumber, $resource, $resourceId): void
@@ -651,12 +699,21 @@ class ProcessCommand extends Command
                     continue;
                 }
                 if(array_key_exists($ir->getResourceId(), $this->resourcesByResourceId) && array_key_exists($ir->getObjectId(), $this->objectsByObjectId)) {
-                    $images = $this->qiImages[$ir->getObjectId()];
                     $resource = $this->resourcesByResourceId[$ir->getResourceId()];
-                    $qiImage = $this->qi->getMatchingImageToBeLinked($images, $ir->getOriginalFilename(), $ir->getWidth(), $ir->getHeight(), $ir->getFilesize(), $this->qiMediaFolderIds);
+                    $object = $this->getObjectForNewLink($this->objectsByObjectId[$ir->getObjectId()],
+                        trim($resource[$this->rsFields['inventorynumber']]));
+                    if($object === null) {
+                        continue;
+                    }
+                    $images = $this->qiImages[$ir->getObjectId()];
+                    $qiImage = $this->findResourceLink($images, $ir->getResourceId());
+                    $addLinkDams = $qiImage === null;
+                    if($addLinkDams) {
+                        $qiImage = $this->qi->getMatchingImageToBeLinked($images, $ir->getOriginalFilename(), $ir->getWidth(), $ir->getHeight(), $ir->getFilesize(), $this->qiMediaFolderIds);
+                    }
                     if ($qiImage !== null) {
                         if($this->update) {
-                            $this->qi->updateMetadata($qiImage, $resource, $this->rsFields, $this->qiImportMapping, $this->qiLinkDamsPrefix, true, $this->qiReindexUrl . $ir->getObjectId());
+                            $this->qi->updateMetadata($qiImage, $resource, $this->rsFields, $this->qiImportMapping, $this->qiLinkDamsPrefix, $addLinkDams, $this->qiReindexUrl . $ir->getObjectId());
                             $ir->setLinked(1);
                             $this->entityManager->persist($ir);
                             $this->entityManager->flush();

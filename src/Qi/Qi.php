@@ -43,6 +43,7 @@ class Qi
     private array $objectsByObjectId;
     private array $objectsByInventoryNumber;
     private array $ambiguousInventoryNumbers = [];
+    private array $objectRetrievalResults = [];
 
     public function __construct($entityManager, $qi, $creditConfig, $test, $debug, $update, $fullProcessing, $onlyOnlineRecords, $httpUtil, $maxFieldValueLength)
     {
@@ -81,6 +82,7 @@ class Qi
         $this->objectsByObjectId = [];
         $this->objectsByInventoryNumber = [];
         $this->ambiguousInventoryNumbers = [];
+        $this->objectRetrievalResults = [];
 
         try {
             if($this->fullProcessing) {
@@ -155,22 +157,8 @@ class Qi
                     ->setParameter('twoWeeksAgo', $twoWeeksAgo)
                     ->getQuery()
                     ->getResult();
-                $loadedObjects = [];
                 foreach($importedResourcesObjects as $importedResource) {
-                    if(!array_key_exists($importedResource->getObjectId(), $loadedObjects)) {
-                        $objectUrl = $this->baseUrl . '/get/object/id/' . $importedResource->getObjectId() . '/_fields/' . urlencode($this->getFields);
-                        try {
-                            $objectsPage = $this->retrieveObjectsPage(
-                                $objectUrl,
-                                self::MAX_SINGLE_OBJECT_RETRIEVAL_ATTEMPTS
-                            );
-                            $this->storeObjects($objectsPage);
-                        } catch(Throwable $exception) {
-                            echo 'Could not retrieve Qi object ' . $importedResource->getObjectId()
-                                . ': ' . $exception->getMessage() . PHP_EOL;
-                        }
-                        $loadedObjects[$importedResource->getObjectId()] = $importedResource->getObjectId();
-                    }
+                    $this->ensureObjectRetrieved($importedResource->getObjectId());
                 }
             }
         } catch(Throwable $exception) {
@@ -178,6 +166,32 @@ class Qi
                 $this->discardStagingTable();
             }
             throw $exception;
+        }
+    }
+
+    /** A cached object is not a successful retrieval in the current run. */
+    public function ensureObjectRetrieved(int $objectId): bool
+    {
+        if($this->fullProcessing) {
+            return true;
+        }
+        if(array_key_exists($objectId, $this->objectRetrievalResults)) {
+            return $this->objectRetrievalResults[$objectId];
+        }
+
+        // Failed checks also remain recorded until the next run, avoiding repeated slow requests.
+        $this->objectRetrievalResults[$objectId] = false;
+        try {
+            $objectUrl = $this->baseUrl . '/get/object/id/' . $objectId . '/_fields/' . urlencode($this->getFields);
+            $objectsPage = $this->retrieveObjectsPage($objectUrl, self::MAX_SINGLE_OBJECT_RETRIEVAL_ATTEMPTS);
+            if(count($objectsPage->records) !== 1 || $this->getValidObjectId($objectsPage->records[0]) !== $objectId) {
+                throw new RuntimeException('Qi did not return the requested object.');
+            }
+            $this->storeObjects($objectsPage);
+            return true;
+        } catch(Throwable $exception) {
+            echo 'Could not retrieve Qi object ' . $objectId . ': ' . $exception->getMessage() . PHP_EOL;
+            return false;
         }
     }
 
@@ -362,10 +376,11 @@ class Qi
             }
             $record->id = $objectId;
 
+            $this->storeCachedObject($record);
             if($indexObjects) {
                 $this->extractRecord($record);
             }
-            $this->storeCachedObject($record);
+            $this->objectRetrievalResults[$objectId] = true;
         }
         if($skippedRecordCount > 0) {
             echo 'Skipped ' . $skippedRecordCount . ' Qi records without a valid object ID.' . PHP_EOL;
@@ -374,6 +389,16 @@ class Qi
 
     private function extractRecord($record): void
     {
+        // Replace old lookup entries too when a refreshed object changes number or goes offline.
+        $objectId = intval($record->id);
+        $previous = $this->objectsByObjectId[$objectId] ?? null;
+        if(!empty($previous->object_number)) {
+            $previousKey = strtolower($previous->object_number);
+            if(($this->objectsByInventoryNumber[$previousKey]->id ?? null) === $objectId) {
+                unset($this->objectsByInventoryNumber[$previousKey]);
+            }
+        }
+        unset($this->objectsByObjectId[$objectId]);
         if(!$this->onlyOnlineRecords || (string) ($record->online ?? '') === '1') {
             $this->objectsByObjectId[intval($record->id)] = $record;
             if(!empty($record->object_number)) {
